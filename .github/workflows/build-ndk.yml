@@ -49,6 +49,8 @@ jobs:
       with:
         manifest-dir: ${{ github.workspace }}
         triplet: arm64-android
+        # Disables fetch depth to ensure all history is available (fixes manifest mode)
+        fetch-depth: 0
         token: ${{ github.token }}
         github-binarycache: true
 
