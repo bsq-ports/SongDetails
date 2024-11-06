@@ -23,7 +23,8 @@ on:
       - '**.md'
       - '.gitignore'
   pull_request:
-    branches: master
+    branches:
+      - master
 
 env:
     module_id: songdetails
@@ -41,7 +42,7 @@ jobs:
         submodules: true
         lfs: true
 
-    - uses: seanmiddleditch/gha-setup-ninja@v3
+    - uses: seanmiddleditch/gha-setup-ninja@v5
 
     - name: Get Protobuf from vcpkg
       uses: johnwason/vcpkg-action@v6
@@ -53,6 +54,7 @@ jobs:
         fetch-depth: 0
         token: ${{ github.token }}
         github-binarycache: true
+        cache-key: 'vcpkg'
 
     # get version from pushed tag
     - name: Extract version
