@@ -5,7 +5,7 @@
     "name": "SongDetails",
     "id": "song-details",
     "version": "0.3.6",
-    "url": "https://github.com/FrozenAlex/SongDetails",
+    "url": "https://github.com/bsq-ports/SongDetails",
     "additionalData": {
       "overrideSoName": "libsongdetails.so",
       "cmake": false
