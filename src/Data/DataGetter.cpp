@@ -17,11 +17,9 @@ namespace SongDetailsCache {
     }
     // just copied from the C# binary (order from bottom to top)
     const std::unordered_map<std::string, std::string> DataGetter::dataSources {
-		// Caches stuff for 5 hours, bandwidth 512KB/s, but at least its a way to get the data at all for people behind China Firewall
-		{ "WGzeyu", "https://beatmods.wgzeyu.com/github/BeatSaberScrappedData/songDetails2.gz" },
 		// Caches stuff for 12 hours as backup
-		{ "JSDelivr", "https://cdn.jsdelivr.net/gh/andruzzzhka/BeatSaberScrappedData/songDetails2.gz" },
-        { "Direct", "https://raw.githubusercontent.com/andruzzzhka/BeatSaberScrappedData/master/songDetails2.gz" },
+		{ "JSDelivr", "https://cdn.jsdelivr.net/gh/kinsi55/BeatSaberScrappedData/songDetails2.gz" },
+        { "Direct", "https://raw.githubusercontent.com/kinsi55/BeatSaberScrappedData/master/songDetails2.gz" },
     };
 
     std::optional<std::ifstream> DataGetter::ReadCachedDatabase() {
