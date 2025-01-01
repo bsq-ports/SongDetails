@@ -7,7 +7,7 @@
 #include <sstream>
 #include <fmt/core.h>
 #include <sys/stat.h>
-#include "gzip/decompress.hpp"
+#include "brotli/decode.h"
 
 namespace SongDetailsCache {
     std::filesystem::path DataGetter::basePath{"/sdcard/ModData/com.beatgames.beatsaber/Mods/SongDetails"};
@@ -18,8 +18,8 @@ namespace SongDetailsCache {
     // just copied from the C# binary (order from bottom to top)
     const std::unordered_map<std::string, std::string> DataGetter::dataSources {
 		// Caches stuff for 12 hours as backup
-		{ "JSDelivr", "https://cdn.jsdelivr.net/gh/kinsi55/BeatSaberScrappedData/songDetails2.gz" },
-        { "Direct", "https://raw.githubusercontent.com/kinsi55/BeatSaberScrappedData/master/songDetails2.gz" },
+		{ "JSDelivr", "https://cdn.jsdelivr.net/gh/kinsi55/BeatSaberScrappedData/songDetails2_v3.br" },
+        { "Direct", "https://raw.githubusercontent.com/kinsi55/BeatSaberScrappedData/master/songDetails2_v3.br" },
     };
 
     std::optional<std::ifstream> DataGetter::ReadCachedDatabase() {
@@ -44,6 +44,84 @@ namespace SongDetailsCache {
         }
 
         return false;
+    }
+
+    bool DataGetter::DecompressBrotli(std::vector<uint8_t>& out, const std::string& in) {
+        const size_t size = in.size();
+        const char* data = in.c_str();
+        if (size == 0) return false;
+
+        // Create decoder state
+        BrotliDecoderState* state = BrotliDecoderCreateInstance(nullptr, nullptr, nullptr);
+        if (!state)
+            return false; // Could not create decoder state
+
+        const uint8_t* next_in = reinterpret_cast<const uint8_t*>(data);
+        size_t available_in = size;
+
+        const size_t chunk_size = 1024 * 1024 * 1;
+
+        // Clear the output vector to start fresh
+        out.clear();
+
+        // Variable for brotli to track available output space
+        size_t available_out = out.size();
+        uint8_t* next_out = &out[0];
+
+        // Total number of bytes written to the output buffer
+        size_t total_out = 0;
+
+        while (true) {
+            const size_t old_size = out.size();
+
+            // Reserve more space if we run out
+            if (available_out == 0) {
+                out.resize(old_size + chunk_size);
+                available_out = chunk_size;
+
+                // Remake the pointer to the new buffer
+                next_out = &out[total_out];
+            }
+
+            // Do the decompression
+            BrotliDecoderResult result = BrotliDecoderDecompressStream(
+                state,
+                &available_in,
+                &next_in,
+                &available_out,
+                &next_out,
+                &total_out
+            );
+
+            // Resize the vector to the actual number of bytes we wrote in this iteration
+            if (out.size() > total_out) {
+                out.resize(total_out);
+            }
+
+            if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT) {
+                // The decoder wants more input, but we have no more data left in `available_in`
+                if (available_in == 0) {
+                    BrotliDecoderDestroyInstance(state);
+                    return false; // Incomplete data
+                }
+                // Otherwise, if you’re streaming from a file or network, you’d load more here
+            }
+            else if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT) {
+                // Our buffer was completely filled, so we loop again to extend it
+                continue;
+            }
+            else if (result == BROTLI_DECODER_RESULT_SUCCESS) {
+                // Decompression successful
+                break;
+            }
+            else {
+                // Some error occurred
+                BrotliDecoderDestroyInstance(state);
+                return false;
+            }
+        }
+        BrotliDecoderDestroyInstance(state);
+        return true;
     }
 
     std::optional<DataGetter::DownloadedDatabase> DataGetter::UpdateAndReadDatabase_internal(std::string_view dataSourceName) {
@@ -97,11 +175,13 @@ namespace SongDetailsCache {
             }
         }
 
-        // decompress contents as gzip
+        // Decompress contents as brotli
         downloadedDatabase.data = std::make_shared<std::vector<uint8_t>>();
-        gzip::Decompressor decompressor{};
-        DEBUG("Decompressing data");
-        decompressor.decompress<std::vector<uint8_t>>(*downloadedDatabase.data, resp.content.c_str(), resp.content.size());
+        auto decompressOk = DecompressBrotli(*downloadedDatabase.data, resp.content);
+        if (!decompressOk) {
+            ERROR("Failed to decompress brotli data");
+            return std::nullopt;
+        }
 
         // DEBUG("Downloaded Database source   : {}", downloadedDatabase.source);
         // DEBUG("Downloaded Database etag     : {}", downloadedDatabase.etag);

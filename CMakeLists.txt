@@ -2,6 +2,22 @@ cmake_minimum_required(VERSION 3.22)
 
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/quest.cmake)
 
+# get the vcpkg dir from env variables
+if(EXISTS $ENV{VCPKG_ROOT})
+    set(VCPKG_ROOT $ENV{VCPKG_ROOT})
+else()
+    MESSAGE(ERROR "Please define the environment variable VCPKG_ROOT with the root to your vcpkg install!")
+endif()
+
+# vcpkg config. Must be before project
+message("VCPKG $ENV{VCPKG_ROOT}")
+set(VCPKG_TARGET_TRIPLET arm64-android)
+set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE ${CMAKE_ANDROID_NDK}/build/cmake/android.toolchain.cmake)
+set(VCPKG_MANIFEST_DIR ${CMAKE_SOURCE_DIR})
+set(VCPKG_INSTALLED_DIR ${CMAKE_SOURCE_DIR}/vcpkg_installed)
+string(REPLACE "\\" "/" VCPKG_ROOT_WINDOWS_FIX $ENV{VCPKG_ROOT})
+set(CMAKE_TOOLCHAIN_FILE ${VCPKG_ROOT_WINDOWS_FIX}/scripts/buildsystems/vcpkg.cmake)
+
 project(${PACKAGE_ID} VERSION ${PACKAGE_VERSION})
 
 # c++ standard
@@ -38,14 +54,10 @@ add_library(
     ${CMAKE_SOURCE_DIR}/src/SongProto.pb.cc # it ends in .cc so add it manually
 )
 
-# get the vcpkg dir from env variables
-if(EXISTS $ENV{VCPKG_ROOT})
-    set(VCPKG_ROOT $ENV{VCPKG_ROOT})
-else()
-    MESSAGE(ERROR "Please define the environment variable VCPKG_ROOT with the root to your vcpkg install!")
-endif()
-
 target_include_directories(${COMPILE_ID} PRIVATE "${VCPKG_ROOT}/installed/arm64-android/include")
+
+find_package(unofficial-brotli CONFIG REQUIRED)
+find_package(protobuf CONFIG REQUIRED)
 
 # add src dir as include dir
 target_include_directories(${COMPILE_ID} PRIVATE ${SOURCE_DIR})
@@ -65,7 +77,9 @@ target_link_libraries(
     PRIVATE
     -llog
     -lz
-    "${VCPKG_ROOT}/installed/arm64-android/lib/libprotobuf.a"
+    unofficial::brotli::brotlidec
+    unofficial::brotli::brotlienc
+    protobuf::libprotobuf
     ${EXTERN_DIR}/libs/libcurl.a
     ${EXTERN_DIR}/libs/libpaperlog.so
 )
