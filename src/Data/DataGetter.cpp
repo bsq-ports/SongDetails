@@ -56,30 +56,29 @@ namespace SongDetailsCache {
         if (!state)
             return false; // Could not create decoder state
 
-        const uint8_t* next_in = reinterpret_cast<const uint8_t*>(data);
-        size_t available_in = size;
 
-        const size_t chunk_size = 1024 * 1024 * 1;
+        const size_t chunk_size = 1024 * 1024 * 1; // 1MB
 
         // Clear the output vector to start fresh
         out.clear();
+        out.resize(chunk_size * 10); // Reserve 10 chunks of 1MB
 
-        // Variable for brotli to track available output space
-        size_t available_out = out.size();
-        uint8_t* next_out = &out[0];
+        // Variables to track input
+        const auto* next_in = reinterpret_cast<const uint8_t*>(data); // Next byte to read from
+        size_t available_in = size;
 
-        // Total number of bytes written to the output buffer
-        size_t total_out = 0;
+        // Variable to track output
+        size_t available_out = out.size(); // Available bytes to write to
+        uint8_t* next_out = &out[0]; // Next byte to write to
+        size_t total_out = 0; // Total number of bytes written to the output buffer
 
         while (true) {
             const size_t old_size = out.size();
 
             // Reserve more space if we run out
-            if (available_out == 0) {
+            if (available_out < chunk_size) {
                 out.resize(old_size + chunk_size);
-                available_out = chunk_size;
-
-                // Remake the pointer to the new buffer
+                available_out = (old_size + chunk_size) - total_out;
                 next_out = &out[total_out];
             }
 
@@ -93,18 +92,13 @@ namespace SongDetailsCache {
                 &total_out
             );
 
-            // Resize the vector to the actual number of bytes we wrote in this iteration
-            if (out.size() > total_out) {
-                out.resize(total_out);
-            }
-
             if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT) {
                 // The decoder wants more input, but we have no more data left in `available_in`
                 if (available_in == 0) {
                     BrotliDecoderDestroyInstance(state);
+                    out.clear();
                     return false; // Incomplete data
                 }
-                // Otherwise, if you’re streaming from a file or network, you’d load more here
             }
             else if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT) {
                 // Our buffer was completely filled, so we loop again to extend it
@@ -112,11 +106,16 @@ namespace SongDetailsCache {
             }
             else if (result == BROTLI_DECODER_RESULT_SUCCESS) {
                 // Decompression successful
+                // Resize the vector to the actual number of bytes we wrote in this iteration
+                if (out.size() > total_out) {
+                    out.resize(total_out);
+                }
                 break;
             }
             else {
                 // Some error occurred
                 BrotliDecoderDestroyInstance(state);
+                out.clear();
                 return false;
             }
         }
