@@ -96,7 +96,7 @@ namespace SongDetailsCache {
 
         if (!get_isDataAvailable()) {
             // TODO: Collect the last error
-            dataLoadFailedInternal.invoke("Unknown error");
+            dataLoadFailedInternal.invoke("DB failed to download");
         }
         SongDetails::isLoading = false;
     }
