@@ -81,6 +81,8 @@ namespace SongDetailsCache {
             /// @return Numeric representation of the Map ID
             uint32_t mapId() const noexcept;
 
+            /// @brief Ranked status of the map on ScoreSaber
+            const RankedStatus rankedStatus;
             /// @brief Ranked state of the map on both ScoreSaber and BeatLeader (bitwise mask)
             const RankedStates rankedStates;
 

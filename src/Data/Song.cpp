@@ -15,6 +15,11 @@ namespace SongDetailsCache {
         uploadTimeUnix(proto ? proto->uploadtimeunix() : 0),
         rankedChangeUnix(proto && proto->has_rankedchangeunix() ? proto->rankedchangeunix() : 0),
         songDurationSeconds(proto && proto->has_songdurationseconds() ? proto->songdurationseconds() : 0),
+        rankedStatus(
+            proto && proto->has_rankedstatebitflags() ?
+                RankedStatusFromRankedStates(static_cast<RankedStates>(proto->rankedstatebitflags()))
+                : RankedStatus::Unranked
+        ),
         rankedStates(static_cast<RankedStates>(proto && proto->has_rankedstatebitflags() ? proto->rankedstatebitflags() : 0)),
         uploadFlags(static_cast<UploadFlags>(proto && proto->has_uploadflags() ? proto->uploadflags(): 0)),
         tags(proto && proto->has_tags() ? proto->tags(): 0)
