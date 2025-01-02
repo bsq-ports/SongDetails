@@ -111,6 +111,10 @@ namespace SongDetailsCache {
                 return this != &none;
             }
 
+            /// @brief Helper method to check if the Song has a tag set
+            /// @param tag string representation of the BeatSaver Tag
+            /// @return whether the tag is set
+            bool HasTag(std::string_view tag) const noexcept;
             /// @brief Helper function to get a difficulty from this song
             /// @param outDiff a reference to the output pointer
             /// @param diff the difficulty to search for

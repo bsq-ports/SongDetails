@@ -18,7 +18,7 @@ namespace SongDetailsCache {
         rankedStates(static_cast<RankedStates>(proto && proto->has_rankedstatebitflags() ? proto->rankedstatebitflags() : 0)),
         uploadFlags(static_cast<UploadFlags>(proto && proto->has_uploadflags() ? proto->uploadflags(): 0)),
         tags(proto && proto->has_tags() ? proto->tags(): 0)
-        {}
+    {}
 
     float Song::min(std::function<float(const SongDifficulty&)> func) const {
         float min = std::numeric_limits<float>::max(); // for minimum, start with the highest value!
@@ -98,6 +98,17 @@ namespace SongDetailsCache {
         auto h = hash();
         std::transform(h.begin(), h.end(), h.begin(), [](auto c){ return std::tolower(c); });
         return fmt::format("https://cdn.beatsaver.com/{}.jpg", h);
+    }
+
+    bool Song::HasTag(std::string_view tag) const noexcept {
+        if (tag.empty() || tags == 0 || SongDetailsContainer::tags == nullptr) return false;
+
+        auto it = SongDetailsContainer::tags->find(tag.data());
+        if (it != SongDetailsContainer::tags->end()) {
+            return (it->second & tags) != 0;
+        }
+
+        return false;
     }
 
     bool Song::GetDifficulty(const SongDifficulty*& outDiff, MapDifficulty diff, MapCharacteristic characteristic) const noexcept {

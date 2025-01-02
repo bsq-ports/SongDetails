@@ -15,7 +15,7 @@ namespace SongDetailsCache {
     shared_ptr_vector<std::string> SongDetailsContainer::songAuthorNames;
     shared_ptr_vector<std::string> SongDetailsContainer::levelAuthorNames;
     shared_ptr_vector<std::string> SongDetailsContainer::uploaderNames;
-    shared_ptr_map<std::string, uint64_t> tags;
+    shared_ptr_unordered_map<std::string, uint64_t> SongDetailsContainer::tags;
 
     std::chrono::sys_seconds SongDetailsContainer::scrapeEndedTimeUnix;
     std::chrono::seconds SongDetailsContainer::updateThrottle = std::chrono::seconds(0);
@@ -154,7 +154,7 @@ namespace SongDetailsCache {
         newLevelAuthorNames->reserve(len);
 		auto newUploaderNames = make_shared_vec<std::string>();
         newUploaderNames->reserve(len);
-        auto newTags = make_shared_map<std::string, uint64_t>();
+        auto newTags = shared_ptr_unordered_map<std::string, uint64_t>();
 
         auto newDiffs = make_shared_vec<SongDifficulty>();
         std::size_t diffLen = 0;
