@@ -13,14 +13,12 @@
 
 namespace SongDetailsCache {
     namespace Structs {
-        struct SongProto;
+        struct SongV3;
     }
     struct SONGDETAILS_EXPORT Song {
         public:
             /// @brief bpm of this map
             const float bpm;
-            /// @brief download count of this map
-            const uint32_t downloadCount;
             /// @brief upvotes of this map
             const uint32_t upvotes;
             /// @brief downvotes of this map
@@ -77,9 +75,6 @@ namespace SongDetailsCache {
             std::string key() const noexcept;
             /// @return Numeric representation of the Map ID
             uint32_t mapId() const noexcept;
-
-            /// @brief Ranked status of the map on ScoreSaber
-            const RankedStatus rankedStatus;
 
             /// @brief Ranked state of the map on both ScoreSaber and BeatLeader (bitwise mask)
             const RankedStates rankedStates;
@@ -145,7 +140,7 @@ namespace SongDetailsCache {
             /// @brief delete copy constructor
             Song(const Song&) = delete;
             /// @brief this needs to be public for specific reasons, but it's not advised to make your own SongDetail::Songs!
-            Song(std::size_t index, std::size_t diffOffset, uint8_t diffCount, const Structs::SongProto* proto) noexcept;
+            Song(std::size_t index, std::size_t diffOffset, uint8_t diffCount, const Structs::SongV3* proto) noexcept;
         private:
             friend class SongDetailsContainer;
             friend class SongDetails;

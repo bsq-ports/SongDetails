@@ -92,7 +92,7 @@ namespace SongDetailsCache {
     void SongDetailsContainer::Process(std::istream& istream, bool force) {
         if (!force && songs) return;
         StopWatch sw; sw.Start();
-        Structs::SongProtoContainer parsedContainer;
+        Structs::SongDetailsV3 parsedContainer;
         if (!parsedContainer.ParseFromIstream(&istream)) {
             ERROR("Failed to parse Song container from istream!");
             return;
@@ -106,7 +106,7 @@ namespace SongDetailsCache {
         if (!force && songs) return;
 
         StopWatch sw; sw.Start();
-        Structs::SongProtoContainer parsedContainer;
+        Structs::SongDetailsV3 parsedContainer;
         if (!parsedContainer.ParseFromArray(data.data(), data.size())) {
             ERROR("Failed to parse Song container from data!");
             return;
@@ -116,10 +116,10 @@ namespace SongDetailsCache {
         Process(parsedContainer, force);
     }
 
-    void SongDetailsContainer::Process(const Structs::SongProtoContainer& parsedContainer, bool force) {
+    void SongDetailsContainer::Process(const Structs::SongDetailsV3& parsedContainer, bool force) {
         if (!force && songs) return;
 
-        scrapeEndedTimeUnix = std::chrono::sys_seconds(std::chrono::seconds(parsedContainer.scrapeendedtimeunix()));
+        scrapeEndedTimeUnix = std::chrono::sys_seconds(std::chrono::seconds(parsedContainer.scrapeendedunix()));
         auto& parsedField = parsedContainer.songs();
 
         if (parsedField.size() == 0) {
@@ -129,7 +129,7 @@ namespace SongDetailsCache {
         const auto len = parsedField.size();
         StopWatch sw; sw.Start();
 
-        std::vector<const SongDetailsCache::Structs::SongProto*> parsed;
+        std::vector<const SongDetailsCache::Structs::SongV3*> parsed;
         parsed.resize(len);
         INFO("Got {} songs in data", len);
         for (std::size_t idx = 0; const auto& s : parsedField) parsed[idx++] = &s;
@@ -166,12 +166,17 @@ namespace SongDetailsCache {
         newDiffs->reserve(diffLen);
         sw.Restart();
         std::size_t diffIndex = 0;
+
+        // Cast it to a vector of SongHashes
+        auto songHashesRaw = reinterpret_cast<const SongHash*>(parsedContainer.songhashes().data());
+        // TODO: hashes are ordered by map, maps are ordered by id, maybe we can skip some calculations
+
         for (std::size_t i = 0; i < len; i++) {
             const auto& parsedSong = parsed[i];
             uint8_t diffCount = std::min(255, parsedSong->difficulties_size());
             const auto& builtSong = newSongs->emplace_back(i, diffIndex, diffCount, parsedSong);
             newKeys->emplace_back(parsedSong->mapid());
-            newHashes->emplace_back(parsedSong->hashbytes());
+            newHashes->emplace_back(songHashesRaw[i]);
 
             newSongNames->emplace_back(parsedSong->songname());
             newSongAuthorNames->emplace_back(parsedSong->songauthorname());

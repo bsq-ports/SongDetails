@@ -5,19 +5,17 @@
 
 namespace SongDetailsCache {
     const Song Song::none(-1, 0, 0, nullptr);
-    Song::Song(std::size_t index, std::size_t diffOffset, uint8_t diffCount, const Structs::SongProto* proto) noexcept :
+    Song::Song(std::size_t index, std::size_t diffOffset, uint8_t diffCount, const Structs::SongV3* proto) noexcept :
         index(index),
         diffOffset(diffOffset),
         diffCount(diffCount),
         bpm(proto ? proto->bpm() : 0),
-        downloadCount(proto ? proto->downloadcount() : 0),
         upvotes(proto ? proto->upvotes() : 0),
         downvotes(proto ? proto->downvotes() : 0),
         uploadTimeUnix(proto ? proto->uploadtimeunix() : 0),
         rankedChangeUnix(proto ? proto->rankedchangeunix() : 0),
         songDurationSeconds(proto ? proto->songdurationseconds() : 0),
-        rankedStatus(static_cast<RankedStatus>(proto ? proto->rankedstate() : 0)),
-        rankedStates(static_cast<RankedStates>(proto ? proto->rankedstates() : 0))
+        rankedStates(static_cast<RankedStates>(proto ? proto->rankedstatebitflags() : 0))
         {}
 
     float Song::min(std::function<float(const SongDifficulty&)> func) const {

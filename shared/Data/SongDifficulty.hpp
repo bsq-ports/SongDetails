@@ -8,7 +8,7 @@
 
 namespace SongDetailsCache {
     namespace Structs {
-        struct SongDifficultyProto;
+        struct SongDifficulty;
     };
     struct SONGDETAILS_EXPORT Song;
     struct SONGDETAILS_EXPORT SongDifficulty {
@@ -69,7 +69,7 @@ namespace SongDetailsCache {
             SongDifficulty(const SongDifficulty&) = delete;
 
             /// @brief This needs to be public for specific reasons, but it's not advised to make your own SongDifficulties
-            SongDifficulty(std::size_t songIndex, const Structs::SongDifficultyProto* proto) noexcept;
+            SongDifficulty(std::size_t songIndex, const Structs::SongDifficulty* proto) noexcept;
         private:
             friend class SongDetailsContainer;
             friend class SongDetails;

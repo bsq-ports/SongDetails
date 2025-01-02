@@ -6,6 +6,7 @@
 #include <future>
 #include <istream>
 #include <chrono>
+#include <SongProto.pb.h>
 
 #include "Data/Song.hpp"
 
@@ -71,6 +72,6 @@ namespace SongDetailsCache {
             static void Load_internal(bool reload, int acceptableAgeHours);
             static void Process(const std::vector<uint8_t>& data, bool force = true);
             static void Process(std::istream& istream, bool force = true);
-            static void Process(const Structs::SongProtoContainer& parsedContainer, bool force = true);
+            static void Process(const Structs::SongDetailsV3& parsedContainer, bool force = true);
     };
 }
