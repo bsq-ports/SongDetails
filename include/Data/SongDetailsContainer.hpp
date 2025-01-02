@@ -21,7 +21,7 @@ namespace SongDetailsCache {
     using shared_ptr_unordered_map = std::shared_ptr<std::unordered_map<T, U>>;
 
     template<typename T, typename U>
-    inline shared_ptr_unordered_map<T, U> make_shared_map() { return std::make_shared<std::unordered_map<T, U>>(); }
+    inline shared_ptr_unordered_map<T, U> make_shared_unordered_map() { return std::make_shared<std::unordered_map<T, U>>(); }
 
     namespace Structs {
         class SongProtoContainer;

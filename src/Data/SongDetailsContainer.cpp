@@ -154,7 +154,7 @@ namespace SongDetailsCache {
         newLevelAuthorNames->reserve(len);
 		auto newUploaderNames = make_shared_vec<std::string>();
         newUploaderNames->reserve(len);
-        auto newTags = shared_ptr_unordered_map<std::string, uint64_t>();
+        auto newTags = make_shared_unordered_map<std::string, uint64_t>();
 
         auto newDiffs = make_shared_vec<SongDifficulty>();
         std::size_t diffLen = 0;
