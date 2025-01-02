@@ -10,12 +10,14 @@ namespace SongDetailsCache {
         diffOffset(diffOffset),
         diffCount(diffCount),
         bpm(proto ? proto->bpm() : 0),
-        upvotes(proto ? proto->upvotes() : 0),
-        downvotes(proto ? proto->downvotes() : 0),
+        upvotes(proto && proto->has_upvotes() ? proto->upvotes() : 0),
+        downvotes(proto && proto->has_downvotes() ? proto->downvotes() : 0),
         uploadTimeUnix(proto ? proto->uploadtimeunix() : 0),
-        rankedChangeUnix(proto ? proto->rankedchangeunix() : 0),
-        songDurationSeconds(proto ? proto->songdurationseconds() : 0),
-        rankedStates(static_cast<RankedStates>(proto ? proto->rankedstatebitflags() : 0))
+        rankedChangeUnix(proto && proto->has_rankedchangeunix() ? proto->rankedchangeunix() : 0),
+        songDurationSeconds(proto && proto->has_songdurationseconds() ? proto->songdurationseconds() : 0),
+        rankedStates(static_cast<RankedStates>(proto && proto->has_rankedstatebitflags() ? proto->rankedstatebitflags() : 0)),
+        uploadFlags(static_cast<UploadFlags>(proto && proto->has_uploadflags() ? proto->uploadflags(): 0)),
+        tags(proto && proto->has_tags() ? proto->tags(): 0)
         {}
 
     float Song::min(std::function<float(const SongDifficulty&)> func) const {
@@ -55,14 +57,7 @@ namespace SongDetailsCache {
         if (!hasFlags(rankedStates, RankedStates::ScoresaberRanked)) return 0.0f;
         return max([](const auto& diff){ return diff.starsSS; });
     }
-    float Song::minPP() const noexcept { 
-        if (!hasFlags(rankedStates, RankedStates::ScoresaberRanked)) return 0.0f;
-        return min([](const auto& diff){ return diff.rankedSS() ? diff.approximatePpValue() : std::numeric_limits<float>::max(); }); 
-    }
-    float Song::maxPP() const noexcept {
-        if (!hasFlags(rankedStates, RankedStates::ScoresaberRanked)) return 0.0f;
-        return max([](const auto& diff){ return diff.approximatePpValue(); }); 
-    }
+
     std::chrono::sys_time<std::chrono::seconds> Song::uploadTime() const noexcept {
         return std::chrono::sys_time<std::chrono::seconds>(std::chrono::seconds(uploadTimeUnix));
     }

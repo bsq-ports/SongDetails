@@ -4,6 +4,7 @@
 #include "SongDifficulty.hpp"
 #include "RankedStatus.hpp"
 #include "RankedStates.hpp"
+#include "UploadFlags.hpp"
 
 #include <chrono>
 #include <functional>
@@ -23,6 +24,10 @@ namespace SongDetailsCache {
             const uint32_t upvotes;
             /// @brief downvotes of this map
             const uint32_t downvotes;
+            /// @brief Upload flags of this map
+            const UploadFlags uploadFlags;
+            /// @brief Raw tags of this map
+            const uint64_t tags;
 
             /// @brief get the minimum of some value you want to know the minimum of for all the diffs of this song
             /// @param func the lambda that returns the value

@@ -45,9 +45,6 @@ namespace SongDetailsCache {
             /// @brief Returns if the Difficulty is ranked on Scoresaber
             bool rankedSS() const noexcept;
 
-            /// @brief Returns the PP value of a 95% Accuracy score
-            float approximatePpValue() const noexcept;
-
             /// @brief shorthand to check the mods enum
             bool usesMods(const MapMods& usedMods) const noexcept;
 

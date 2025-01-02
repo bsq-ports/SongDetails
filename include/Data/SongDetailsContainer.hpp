@@ -16,6 +16,13 @@ namespace SongDetailsCache {
 
     template<typename T>
     inline shared_ptr_vector<T> make_shared_vec() { return std::make_shared<std::vector<T>>(); }
+
+    template<typename T, typename U>
+    using shared_ptr_map = std::shared_ptr<std::map<T, U>>;
+
+    template<typename T, typename U>
+    inline shared_ptr_map<T, U> make_shared_map() { return std::make_shared<std::map<T, U>>(); }
+
     namespace Structs {
         class SongProtoContainer;
     }
@@ -58,6 +65,7 @@ namespace SongDetailsCache {
             static shared_ptr_vector<std::string> songAuthorNames;
             static shared_ptr_vector<std::string> levelAuthorNames;
             static shared_ptr_vector<std::string> uploaderNames;
+            static shared_ptr_map<std::string, uint64_t> tags;
 
             static std::chrono::sys_seconds scrapeEndedTimeUnix;
             static std::chrono::seconds updateThrottle;

@@ -15,6 +15,7 @@ namespace SongDetailsCache {
     shared_ptr_vector<std::string> SongDetailsContainer::songAuthorNames;
     shared_ptr_vector<std::string> SongDetailsContainer::levelAuthorNames;
     shared_ptr_vector<std::string> SongDetailsContainer::uploaderNames;
+    shared_ptr_map<std::string, uint64_t> tags;
 
     std::chrono::sys_seconds SongDetailsContainer::scrapeEndedTimeUnix;
     std::chrono::seconds SongDetailsContainer::updateThrottle = std::chrono::seconds(0);
@@ -153,6 +154,7 @@ namespace SongDetailsCache {
         newLevelAuthorNames->reserve(len);
 		auto newUploaderNames = make_shared_vec<std::string>();
         newUploaderNames->reserve(len);
+        auto newTags = make_shared_map<std::string, uint64_t>();
 
         auto newDiffs = make_shared_vec<SongDifficulty>();
         std::size_t diffLen = 0;
@@ -160,6 +162,12 @@ namespace SongDetailsCache {
         newDiffs->reserve(diffLen);
         sw.Restart();
         std::size_t diffIndex = 0;
+
+        // Fill the tags
+        auto& parsedTagList = parsedContainer.taglist();
+        for (int i = 0; i < parsedTagList.size(); i++) {
+            newTags->emplace(parsedTagList[i], 1UL << i);
+        }
 
         // Cast it to a vector of SongHashes
         auto songHashesRaw = reinterpret_cast<const SongHash*>(parsedContainer.songhashes().data());
@@ -173,7 +181,7 @@ namespace SongDetailsCache {
             newSongNames->emplace_back(parsedSong->songname());
             newSongAuthorNames->emplace_back(parsedSong->songauthorname());
             newLevelAuthorNames->emplace_back(parsedSong->levelauthorname());
-            newUploaderNames->emplace_back(parsedSong->uploadername());
+            newUploaderNames->emplace_back(parsedSong->has_uploadername()? parsedSong->uploadername() : "");
             if (parsedSong->difficulties().empty()) continue;
 
             for (const auto& diff : parsedSong->difficulties()) {
@@ -210,6 +218,7 @@ namespace SongDetailsCache {
         songAuthorNames = newSongAuthorNames;
         levelAuthorNames = newLevelAuthorNames;
         uploaderNames = newUploaderNames;
+        tags = newTags;
 
         difficulties = newDiffs;
 
