@@ -129,16 +129,10 @@ namespace SongDetailsCache {
         const auto len = parsedField.size();
         StopWatch sw; sw.Start();
 
-        std::vector<const SongDetailsCache::Structs::SongV3*> parsed;
+        std::vector<const Structs::SongV3*> parsed;
         parsed.resize(len);
         INFO("Got {} songs in data", len);
         for (std::size_t idx = 0; const auto& s : parsedField) parsed[idx++] = &s;
-        // sort a copied vector
-        std::stable_sort(parsed.begin(), parsed.end(), [](auto lhs, auto rhs){
-            return lhs->mapid() < rhs->mapid();
-        });
-
-        INFO("Sorted input in {}ms", sw.EllapsedMilliseconds());
 
         // we run everything with resize so everything is already valid memory
         auto newSongs = make_shared_vec<Song>();
@@ -169,8 +163,6 @@ namespace SongDetailsCache {
 
         // Cast it to a vector of SongHashes
         auto songHashesRaw = reinterpret_cast<const SongHash*>(parsedContainer.songhashes().data());
-        // TODO: hashes are ordered by map, maps are ordered by id, maybe we can skip some calculations
-
         for (std::size_t i = 0; i < len; i++) {
             const auto& parsedSong = parsed[i];
             uint8_t diffCount = std::min(255, parsedSong->difficulties_size());
