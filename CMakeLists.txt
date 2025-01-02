@@ -78,7 +78,6 @@ target_link_libraries(
     -llog
     -lz
     unofficial::brotli::brotlidec
-    unofficial::brotli::brotlienc
     protobuf::libprotobuf
     ${EXTERN_DIR}/libs/libcurl.a
     ${EXTERN_DIR}/libs/libpaperlog.so
