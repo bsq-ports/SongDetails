@@ -24,7 +24,7 @@ namespace SongDetailsCache {
     shared_ptr_vector<SongDifficulty> SongDetailsContainer::difficulties;
 
     UnorderedEventCallback<> SongDetailsContainer::dataAvailableOrUpdatedInternal;
-    UnorderedEventCallback<> SongDetailsContainer::dataLoadFailedInternal;
+    UnorderedEventCallback<std::string> SongDetailsContainer::dataLoadFailedInternal;
 
     std::future<void> SongDetailsContainer::Load(bool reload, int acceptableAgeHours) {
         return std::async(std::launch::async, std::bind(&SongDetailsContainer::Load_internal, reload, acceptableAgeHours));
@@ -38,17 +38,27 @@ namespace SongDetailsCache {
         bool shouldLoadFresh = false;
         if (stat(DataGetter::cachePath().c_str(), &fInfo) == 0) { // only succeeds if exists
             if (!get_isDataAvailable() || reload) {
-                auto cachedStreamOpt = DataGetter::ReadCachedDatabase();
-                if (cachedStreamOpt) {
-                    DEBUG("Processing cached data!");
-                    StopWatch sw; sw.Start();
-                    Process(*cachedStreamOpt, false);
-                    DEBUG("Processed cached data in {}ms", sw.EllapsedMilliseconds());
-                    cachedStreamOpt->close();
+                try {
+                    auto cachedStreamOpt = DataGetter::ReadCachedDatabase();
+                    if (cachedStreamOpt) {
+                        DEBUG("Processing cached data!");
+                        StopWatch sw; sw.Start();
+                        Process(*cachedStreamOpt, false);
+                        DEBUG("Processed cached data in {}ms", sw.EllapsedMilliseconds());
+                        cachedStreamOpt->close();
+
+                        if (!get_isDataAvailable()) {
+                            INFO("Failed to load cached data, will try to load fresh data");
+                            shouldLoadFresh = true;
+                        }
+                    }
+                } catch (...) {
+                    ERROR("Failed to read cached data, will try to load fresh data");
+                    shouldLoadFresh = true;
                 }
             }
 
-            if (std::chrono::system_clock::now().time_since_epoch() - scrapeEndedTimeUnix.time_since_epoch() > std::chrono::hours(std::max(acceptableAgeHours, 1))) {
+            if (get_isDataAvailable() && std::chrono::system_clock::now().time_since_epoch() - scrapeEndedTimeUnix.time_since_epoch() > std::chrono::hours(std::max(acceptableAgeHours, 1))) {
                 shouldLoadFresh = true;
             }
         } else { // didn't exist or otherwise failed
@@ -85,7 +95,8 @@ namespace SongDetailsCache {
         }
 
         if (!get_isDataAvailable()) {
-            dataLoadFailedInternal.invoke();
+            // TODO: Collect the last error
+            dataLoadFailedInternal.invoke("Unknown error");
         }
         SongDetails::isLoading = false;
     }

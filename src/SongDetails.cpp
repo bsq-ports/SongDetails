@@ -6,7 +6,7 @@
 namespace SongDetailsCache {
     SongDetails SongDetails::instance{};
     UnorderedEventCallback<> SongDetails::dataAvailableOrUpdated;
-    UnorderedEventCallback<> SongDetails::dataLoadFailed;
+    UnorderedEventCallback<std::string> SongDetails::dataLoadFailed;
 
     bool ::SongDetailsCache::SongDetails::isLoading = false;
 
@@ -33,8 +33,8 @@ namespace SongDetailsCache {
         instance.dataAvailableOrUpdated.invoke();
     }
 
-    void SongDetails::DataLoadFailed() {
-        instance.dataLoadFailed.invoke();
+    void SongDetails::DataLoadFailed(std::string message) {
+        instance.dataLoadFailed.invoke(message);
     }
 
     void SongDetails::SetCacheDirectory(std::filesystem::path path) {
