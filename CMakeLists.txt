@@ -24,7 +24,6 @@ project(${PACKAGE_ID} VERSION ${PACKAGE_VERSION})
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 # define that stores the actual source directory
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -33,6 +32,17 @@ set(COMPILE_ID songdetails)
 
 # compile options used
 add_compile_options(-frtti -fPIE -fPIC -fexceptions -fvisibility=hidden)
+
+if(${CMAKE_BUILD_TYPE} STREQUAL "RELEASE" OR ${CMAKE_BUILD_TYPE} STREQUAL "RelWithDebInfo" OR ${CMAKE_BUILD_TYPE} STREQUAL "MinSizeRel")
+    
+    # Better optimizations
+    add_compile_options(-O3)
+
+    # LTO
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    add_compile_options(-flto)
+endif()
+
 # compile definitions used
 add_compile_definitions(VERSION=\"${PACKAGE_VERSION}\")
 add_compile_definitions(MOD_ID=\"${PACKAGE_ID}\")
@@ -65,8 +75,6 @@ target_include_directories(${COMPILE_ID} PRIVATE ${SOURCE_DIR})
 target_include_directories(${COMPILE_ID} PRIVATE ${INCLUDE_DIR})
 # add shared dir as include dir
 target_include_directories(${COMPILE_ID} PUBLIC ${SHARED_DIR})
-# gzip library
-target_include_directories(${COMPILE_ID} PRIVATE ${INCLUDE_DIR}/gzip-hpp/include)
 
 target_include_directories(${COMPILE_ID} PRIVATE ${EXTERN_DIR}/includes)
 target_include_directories(${COMPILE_ID} SYSTEM PRIVATE ${EXTERN_DIR}/includes/libil2cpp/il2cpp/libil2cpp)
