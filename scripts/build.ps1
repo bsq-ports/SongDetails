@@ -22,6 +22,9 @@ if (($clean.IsPresent) -or (-not (Test-Path -Path "build")))
 $buildType = "Debug"
 if ($release.IsPresent) {
     $buildType = "RelWithDebInfo"
+    echo "Building release"
+} else {
+    echo "Building debug"
 }
 
 & cmake -G "Ninja" -DCMAKE_BUILD_TYPE="$buildType" -B ./build -S .

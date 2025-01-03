@@ -2,10 +2,12 @@ param (
     [Parameter(Mandatory=$false)]
     [Switch]$debug_so,
     [Parameter(Mandatory=$false)]
-    [Switch]$log
+    [Switch]$log,
+    [Parameter(Mandatory=$false)]
+    [Switch]$release
 )
 
-& $PSScriptRoot/build.ps1
+& $PSScriptRoot/build.ps1 -release:$release
 if (-not ($LastExitCode -eq 0)) {
     echo "build failed, not copying"
     exit

@@ -47,7 +47,7 @@
         "pwsh ./scripts/log.ps1"
       ],
       "qmod": [
-        "pwsh ./scripts/build.ps1 -clean",
+        "pwsh ./scripts/build.ps1 -clean -release",
         "qpm qmod manifest",
         "pwsh ./scripts/createqmod.ps1 SongDetails -clean"
       ]

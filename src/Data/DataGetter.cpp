@@ -1,4 +1,5 @@
 #include "Data/DataGetter.hpp"
+#include "StopWatch.hpp"
 #include "Utils.hpp"
 #include "logging.hpp"
 
@@ -175,13 +176,14 @@ namespace SongDetailsCache {
         }
 
         // Decompress contents as brotli
+        StopWatch sw; sw.Start();
         downloadedDatabase.data = std::make_shared<std::vector<uint8_t>>();
         auto decompressOk = DecompressBrotli(*downloadedDatabase.data, resp.content);
         if (!decompressOk) {
             ERROR("Failed to decompress brotli data");
             return std::nullopt;
         }
-
+        INFO("Decompressed brotli data in {}ms", sw.EllapsedMilliseconds());
         // DEBUG("Downloaded Database source   : {}", downloadedDatabase.source);
         // DEBUG("Downloaded Database etag     : {}", downloadedDatabase.etag);
         // DEBUG("Downloaded Database data     : {}", fmt::ptr(downloadedDatabase.data->data()));
