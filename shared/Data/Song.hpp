@@ -4,6 +4,7 @@
 #include "SongDifficulty.hpp"
 #include "RankedStatus.hpp"
 #include "RankedStates.hpp"
+#include "UploadFlags.hpp"
 
 #include <chrono>
 #include <functional>
@@ -13,18 +14,20 @@
 
 namespace SongDetailsCache {
     namespace Structs {
-        struct SongProto;
+        struct SongV3;
     }
     struct SONGDETAILS_EXPORT Song {
         public:
             /// @brief bpm of this map
             const float bpm;
-            /// @brief download count of this map
-            const uint32_t downloadCount;
             /// @brief upvotes of this map
             const uint32_t upvotes;
             /// @brief downvotes of this map
             const uint32_t downvotes;
+            /// @brief Upload flags of this map
+            const UploadFlags uploadFlags;
+            /// @brief Raw tags of this map
+            const uint64_t tags;
 
             /// @brief get the minimum of some value you want to know the minimum of for all the diffs of this song
             /// @param func the lambda that returns the value
@@ -80,7 +83,6 @@ namespace SongDetailsCache {
 
             /// @brief Ranked status of the map on ScoreSaber
             const RankedStatus rankedStatus;
-
             /// @brief Ranked state of the map on both ScoreSaber and BeatLeader (bitwise mask)
             const RankedStates rankedStates;
 
@@ -111,6 +113,10 @@ namespace SongDetailsCache {
                 return this != &none;
             }
 
+            /// @brief Helper method to check if the Song has a tag set
+            /// @param tag string representation of the BeatSaver Tag
+            /// @return whether the tag is set
+            bool HasTag(std::string_view tag) const noexcept;
             /// @brief Helper function to get a difficulty from this song
             /// @param outDiff a reference to the output pointer
             /// @param diff the difficulty to search for
@@ -145,7 +151,7 @@ namespace SongDetailsCache {
             /// @brief delete copy constructor
             Song(const Song&) = delete;
             /// @brief this needs to be public for specific reasons, but it's not advised to make your own SongDetail::Songs!
-            Song(std::size_t index, std::size_t diffOffset, uint8_t diffCount, const Structs::SongProto* proto) noexcept;
+            Song(std::size_t index, std::size_t diffOffset, uint8_t diffCount, const Structs::SongV3* proto) noexcept;
         private:
             friend class SongDetailsContainer;
             friend class SongDetails;

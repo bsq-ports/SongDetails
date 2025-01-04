@@ -1,5 +1,7 @@
 #pragma once
 
+#include "RankedStates.hpp"
+
 #include "../_config.h"
 
 namespace SongDetailsCache {
@@ -9,6 +11,12 @@ namespace SongDetailsCache {
         Qualified = 2,
         Queued = 3,
     };
+
+    static RankedStatus RankedStatusFromRankedStates(RankedStates states) {
+        if (hasFlags(states, RankedStates::ScoresaberRanked)) return RankedStatus::Ranked;
+        if (hasFlags(states, RankedStates::ScoresaberQualified)) return RankedStatus::Qualified;
+        return RankedStatus::Unranked;
+    }
 }
 
 // if we have fmt, add formatting methods

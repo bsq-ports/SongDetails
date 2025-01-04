@@ -27,6 +27,7 @@ namespace SongDetailsCache {
             static std::filesystem::path basePath;
             friend class SongDetails;
             static void WriteCachedDatabase_internal(DownloadedDatabase& db);
+            static bool DecompressBrotli(std::vector<uint8_t>& out, std::string const& in);
             static std::optional<DownloadedDatabase> UpdateAndReadDatabase_internal(std::string_view dataSourceName = "Direct");
     };
 }
