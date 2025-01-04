@@ -155,14 +155,15 @@ inline bool RankedStatusBitflags_Parse(
 }
 enum UploadFlags : int {
   None = 0,
-  VerifiedUploader = 1,
-  Curated = 2,
+  CuratedMap = 1,
+  VerifiedUploader = 2,
+  HasV3Environment = 4,
   UploadFlags_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
   UploadFlags_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
 };
 bool UploadFlags_IsValid(int value);
 constexpr UploadFlags UploadFlags_MIN = None;
-constexpr UploadFlags UploadFlags_MAX = Curated;
+constexpr UploadFlags UploadFlags_MAX = HasV3Environment;
 constexpr int UploadFlags_ARRAYSIZE = UploadFlags_MAX + 1;
 
 const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* UploadFlags_descriptor();

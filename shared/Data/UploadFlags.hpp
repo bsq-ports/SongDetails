@@ -10,6 +10,7 @@ namespace SongDetailsCache {
         None =                 0,
         Curated =              1 << 0,
         VerifiedUploader =     1 << 1,
+        HasV3Environment =     1 << 2,
     };
 
     static constexpr UploadFlags operator |(const UploadFlags& lhs, const UploadFlags& rhs) {
@@ -37,6 +38,7 @@ namespace SongDetailsCache {
         if (hasFlags(states, UploadFlags::None)) result.emplace_back("None");
         if (hasFlags(states, UploadFlags::Curated)) result.emplace_back("Curated");
         if (hasFlags(states, UploadFlags::VerifiedUploader)) result.emplace_back("VerifiedUploader");
+        if (hasFlags(states, UploadFlags::HasV3Environment)) result.emplace_back("HasV3Environment");
         return result;
     }
 }
@@ -59,6 +61,12 @@ template <> struct SONGDETAILS_EXPORT fmt::formatter<::SongDetailsCache::UploadF
                 result += " | ";
             }
             result += "VerifiedUploader";
+        }
+        if (hasFlags(s, SongDetailsCache::UploadFlags::HasV3Environment) ) {
+            if (!result.empty()) {
+                result += " | ";
+            }
+            result += "HasV3Environment";
         }
         if (result.empty()) {
             result = "None";

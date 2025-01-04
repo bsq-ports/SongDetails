@@ -20,8 +20,9 @@ enum RankedStatusBitflags {
 
 enum UploadFlags {
 	None = 0;
-	VerifiedUploader = 1;
-	Curated = 2;
+	CuratedMap = 1;
+	VerifiedUploader = 2;
+	HasV3Environment = 4;
 }
 
 message SongV3 {

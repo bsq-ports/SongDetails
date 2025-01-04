@@ -220,13 +220,14 @@ const char descriptor_table_protodef_SongProto_2eproto[] PROTOBUF_SECTION_VARIAB
   "\n\014_starsT100BLB\010\n\006_bombsB\010\n\006_notesB\014\n\n_o"
   "bstaclesB\007\n\005_mods*b\n\024RankedStatusBitflag"
   "s\022\014\n\010Unranked\020\000\022\014\n\010RankedSS\020\001\022\014\n\010RankedB"
-  "L\020\002\022\017\n\013QualifiedSS\020\004\022\017\n\013QualifiedBL\020\010*:\n"
-  "\013UploadFlags\022\010\n\004None\020\000\022\024\n\020VerifiedUpload"
-  "er\020\001\022\013\n\007Curated\020\002b\006proto3"
+  "L\020\002\022\017\n\013QualifiedSS\020\004\022\017\n\013QualifiedBL\020\010*S\n"
+  "\013UploadFlags\022\010\n\004None\020\000\022\016\n\nCuratedMap\020\001\022\024"
+  "\n\020VerifiedUploader\020\002\022\024\n\020HasV3Environment"
+  "\020\004b\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_SongProto_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_SongProto_2eproto = {
-    false, false, 1665, descriptor_table_protodef_SongProto_2eproto,
+    false, false, 1690, descriptor_table_protodef_SongProto_2eproto,
     "SongProto.proto",
     &descriptor_table_SongProto_2eproto_once, nullptr, 0, 3,
     schemas, file_default_instances, TableStruct_SongProto_2eproto::offsets,
@@ -327,6 +328,7 @@ bool UploadFlags_IsValid(int value) {
     case 0:
     case 1:
     case 2:
+    case 4:
       return true;
     default:
       return false;
