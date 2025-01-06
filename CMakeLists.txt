@@ -67,7 +67,7 @@ target_link_libraries(
     -lz
     "${VCPKG_ROOT}/installed/arm64-android/lib/libprotobuf.a"
     ${EXTERN_DIR}/libs/libcurl.a
-    ${EXTERN_DIR}/libs/libpaperlog.so
+    ${EXTERN_DIR}/libs/libpaper2_scotland2.so
 )
 
 add_custom_command(TARGET ${COMPILE_ID} POST_BUILD

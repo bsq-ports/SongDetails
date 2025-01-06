@@ -22,8 +22,8 @@ namespace SongDetailsCache {
     shared_ptr_vector<Song> SongDetailsContainer::songs;
     shared_ptr_vector<SongDifficulty> SongDetailsContainer::difficulties;
 
-    UnorderedEventCallback<> SongDetailsContainer::dataAvailableOrUpdatedInternal;
-    UnorderedEventCallback<> SongDetailsContainer::dataLoadFailedInternal;
+    BSHookUtils::UnorderedEventCallback<> SongDetailsContainer::dataAvailableOrUpdatedInternal;
+    BSHookUtils::UnorderedEventCallback<> SongDetailsContainer::dataLoadFailedInternal;
 
     std::future<void> SongDetailsContainer::Load(bool reload, int acceptableAgeHours) {
         return std::async(std::launch::async, std::bind(&SongDetailsContainer::Load_internal, reload, acceptableAgeHours));
