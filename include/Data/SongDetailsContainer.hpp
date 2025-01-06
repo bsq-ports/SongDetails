@@ -1,6 +1,6 @@
 #pragma once
 
-#include "beatsaber-hook/shared/utils/typedefs-wrappers.hpp"
+#include "bshook-utils.hpp"
 #include <stdint.h>
 #include <vector>
 #include <future>
@@ -75,8 +75,8 @@ namespace SongDetailsCache {
 
             static bool get_isDataAvailable() { return songs && !songs->empty(); }
 
-            static UnorderedEventCallback<> dataAvailableOrUpdatedInternal;
-            static UnorderedEventCallback<std::string> dataLoadFailedInternal;
+            static BSHookUtils::UnorderedEventCallback<> dataAvailableOrUpdatedInternal;
+            static BSHookUtils::UnorderedEventCallback<std::string> dataLoadFailedInternal;
             static void Load_internal(bool reload, int acceptableAgeHours);
             static void Process(const std::vector<uint8_t>& data, bool force = true);
             static void Process(std::istream& istream, bool force = true);

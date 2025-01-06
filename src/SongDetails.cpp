@@ -5,8 +5,8 @@
 
 namespace SongDetailsCache {
     SongDetails SongDetails::instance{};
-    UnorderedEventCallback<> SongDetails::dataAvailableOrUpdated;
-    UnorderedEventCallback<std::string> SongDetails::dataLoadFailed;
+    BSHookUtils::UnorderedEventCallback<> SongDetails::dataAvailableOrUpdated;
+    BSHookUtils::UnorderedEventCallback<std::string> SongDetails::dataLoadFailed;
 
     bool ::SongDetailsCache::SongDetails::isLoading = false;
 

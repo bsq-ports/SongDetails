@@ -1,7 +1,7 @@
 #pragma once
 
 #include "./_config.h"
-#include "beatsaber-hook/shared/utils/typedefs-wrappers.hpp"
+#include "bshook-utils.hpp"
 #include "Data/Song.hpp"
 #include "Data/SongDifficulty.hpp"
 #include "SongArray.hpp"
@@ -38,10 +38,10 @@ namespace SongDetailsCache {
             std::chrono::sys_seconds get_scrapeEndedTimeUnix() const;
 
             /// @brief Invoked when data is available or was updated
-            static UnorderedEventCallback<> dataAvailableOrUpdated;
+            static BSHookUtils::UnorderedEventCallback<> dataAvailableOrUpdated;
 
             /// @brief Invoked when data failed to load
-            static UnorderedEventCallback<std::string> dataLoadFailed;
+            static BSHookUtils::UnorderedEventCallback<std::string> dataLoadFailed;
         private:
             SongDetails() noexcept;
             static void DataAvailableOrUpdated();

@@ -12,3 +12,4 @@ mod.json
 vcpkg_installed/
 cmake-build-debug/
 .idea/
+ndkpath.txt
