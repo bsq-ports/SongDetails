@@ -5,20 +5,25 @@
 
 namespace SongDetailsCache {
     const Song Song::none(-1, 0, 0, nullptr);
-    Song::Song(std::size_t index, std::size_t diffOffset, uint8_t diffCount, const Structs::SongProto* proto) noexcept :
+    Song::Song(std::size_t index, std::size_t diffOffset, uint8_t diffCount, const Structs::SongV3* proto) noexcept :
         index(index),
         diffOffset(diffOffset),
         diffCount(diffCount),
         bpm(proto ? proto->bpm() : 0),
-        downloadCount(proto ? proto->downloadcount() : 0),
-        upvotes(proto ? proto->upvotes() : 0),
-        downvotes(proto ? proto->downvotes() : 0),
+        upvotes(proto && proto->has_upvotes() ? proto->upvotes() : 0),
+        downvotes(proto && proto->has_downvotes() ? proto->downvotes() : 0),
         uploadTimeUnix(proto ? proto->uploadtimeunix() : 0),
-        rankedChangeUnix(proto ? proto->rankedchangeunix() : 0),
-        songDurationSeconds(proto ? proto->songdurationseconds() : 0),
-        rankedStatus(static_cast<RankedStatus>(proto ? proto->rankedstate() : 0)),
-        rankedStates(static_cast<RankedStates>(proto ? proto->rankedstates() : 0))
-        {}
+        rankedChangeUnix(proto && proto->has_rankedchangeunix() ? proto->rankedchangeunix() : 0),
+        songDurationSeconds(proto && proto->has_songdurationseconds() ? proto->songdurationseconds() : 0),
+        rankedStatus(
+            proto && proto->has_rankedstatebitflags() ?
+                RankedStatusFromRankedStates(static_cast<RankedStates>(proto->rankedstatebitflags()))
+                : RankedStatus::Unranked
+        ),
+        rankedStates(static_cast<RankedStates>(proto && proto->has_rankedstatebitflags() ? proto->rankedstatebitflags() : 0)),
+        uploadFlags(static_cast<UploadFlags>(proto && proto->has_uploadflags() ? proto->uploadflags(): 0)),
+        tags(proto && proto->has_tags() ? proto->tags(): 0)
+    {}
 
     float Song::min(std::function<float(const SongDifficulty&)> func) const {
         float min = std::numeric_limits<float>::max(); // for minimum, start with the highest value!
@@ -57,14 +62,7 @@ namespace SongDetailsCache {
         if (!hasFlags(rankedStates, RankedStates::ScoresaberRanked)) return 0.0f;
         return max([](const auto& diff){ return diff.starsSS; });
     }
-    float Song::minPP() const noexcept { 
-        if (!hasFlags(rankedStates, RankedStates::ScoresaberRanked)) return 0.0f;
-        return min([](const auto& diff){ return diff.rankedSS() ? diff.approximatePpValue() : std::numeric_limits<float>::max(); }); 
-    }
-    float Song::maxPP() const noexcept {
-        if (!hasFlags(rankedStates, RankedStates::ScoresaberRanked)) return 0.0f;
-        return max([](const auto& diff){ return diff.approximatePpValue(); }); 
-    }
+
     std::chrono::sys_time<std::chrono::seconds> Song::uploadTime() const noexcept {
         return std::chrono::sys_time<std::chrono::seconds>(std::chrono::seconds(uploadTimeUnix));
     }
@@ -105,6 +103,17 @@ namespace SongDetailsCache {
         auto h = hash();
         std::transform(h.begin(), h.end(), h.begin(), [](auto c){ return std::tolower(c); });
         return fmt::format("https://cdn.beatsaver.com/{}.jpg", h);
+    }
+
+    bool Song::HasTag(std::string_view tag) const noexcept {
+        if (tag.empty() || tags == 0 || SongDetailsContainer::tags == nullptr) return false;
+
+        auto it = SongDetailsContainer::tags->find(tag.data());
+        if (it != SongDetailsContainer::tags->end()) {
+            return (it->second & tags) != 0;
+        }
+
+        return false;
     }
 
     bool Song::GetDifficulty(const SongDifficulty*& outDiff, MapDifficulty diff, MapCharacteristic characteristic) const noexcept {

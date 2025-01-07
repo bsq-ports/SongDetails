@@ -10,3 +10,6 @@ mod.json
 *.~cpp
 *.~hpp
 vcpkg_installed/
+cmake-build-debug/
+.idea/
+ndkpath.txt

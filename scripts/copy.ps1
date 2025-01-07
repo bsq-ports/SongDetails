@@ -2,19 +2,21 @@ param (
     [Parameter(Mandatory=$false)]
     [Switch]$debug_so,
     [Parameter(Mandatory=$false)]
-    [Switch]$log
+    [Switch]$log,
+    [Parameter(Mandatory=$false)]
+    [Switch]$release
 )
 
-& $PSScriptRoot/build.ps1
+& $PSScriptRoot/build.ps1 -release:$release
 if (-not ($LastExitCode -eq 0)) {
     echo "build failed, not copying"
     exit
 }
 
 if ($debug_so.IsPresent) {
-    & adb push build/debug/libsongdetails.so /sdcard/Android/data/com.beatgames.beatsaber/files/libs/libsongdetails.so
+    & adb push build/debug/libsongdetails.so /sdcard/ModData/com.beatgames.beatsaber/Modloader/libs/libsongdetails.so
 } else {
-    & adb push build/libsongdetails.so /sdcard/Android/data/com.beatgames.beatsaber/files/libs/libsongdetails.so
+    & adb push build/libsongdetails.so /sdcard/ModData/com.beatgames.beatsaber/Modloader/libs/libsongdetails.so
 }
 
 & adb shell am force-stop com.beatgames.beatsaber

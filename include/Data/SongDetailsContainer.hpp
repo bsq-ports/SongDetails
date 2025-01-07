@@ -6,6 +6,7 @@
 #include <future>
 #include <istream>
 #include <chrono>
+#include <SongProto.pb.h>
 
 #include "Data/Song.hpp"
 
@@ -15,6 +16,13 @@ namespace SongDetailsCache {
 
     template<typename T>
     inline shared_ptr_vector<T> make_shared_vec() { return std::make_shared<std::vector<T>>(); }
+
+    template<typename T, typename U>
+    using shared_ptr_unordered_map = std::shared_ptr<std::unordered_map<T, U>>;
+
+    template<typename T, typename U>
+    inline shared_ptr_unordered_map<T, U> make_shared_unordered_map() { return std::make_shared<std::unordered_map<T, U>>(); }
+
     namespace Structs {
         class SongProtoContainer;
     }
@@ -57,6 +65,7 @@ namespace SongDetailsCache {
             static shared_ptr_vector<std::string> songAuthorNames;
             static shared_ptr_vector<std::string> levelAuthorNames;
             static shared_ptr_vector<std::string> uploaderNames;
+            static shared_ptr_unordered_map<std::string, uint64_t> tags;
 
             static std::chrono::sys_seconds scrapeEndedTimeUnix;
             static std::chrono::seconds updateThrottle;
@@ -67,10 +76,12 @@ namespace SongDetailsCache {
             static bool get_isDataAvailable() { return songs && !songs->empty(); }
 
             static BSHookUtils::UnorderedEventCallback<> dataAvailableOrUpdatedInternal;
-            static BSHookUtils::UnorderedEventCallback<> dataLoadFailedInternal;
+
+            static BSHookUtils::UnorderedEventCallback<std::string> dataLoadFailedInternal;
+
             static void Load_internal(bool reload, int acceptableAgeHours);
             static void Process(const std::vector<uint8_t>& data, bool force = true);
             static void Process(std::istream& istream, bool force = true);
-            static void Process(const Structs::SongProtoContainer& parsedContainer, bool force = true);
+            static void Process(const Structs::SongDetailsV3& parsedContainer, bool force = true);
     };
 }

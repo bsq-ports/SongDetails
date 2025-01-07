@@ -4,7 +4,7 @@
   "info": {
     "name": "SongDetails",
     "id": "song-details",
-    "version": "0.3.7",
+    "version": "1.0.0",
     "url": "https://github.com/bsq-ports/SongDetails",
     "additionalData": {
       "overrideSoName": "libsongdetails.so",
@@ -42,7 +42,7 @@
         "pwsh ./scripts/log.ps1"
       ],
       "qmod": [
-        "pwsh ./scripts/build.ps1 -clean",
+        "pwsh ./scripts/build.ps1 -clean -release",
         "qpm qmod manifest",
         "pwsh ./scripts/createqmod.ps1 SongDetails -clean"
       ]

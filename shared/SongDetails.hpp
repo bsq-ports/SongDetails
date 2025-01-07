@@ -41,11 +41,12 @@ namespace SongDetailsCache {
             static BSHookUtils::UnorderedEventCallback<> dataAvailableOrUpdated;
 
             /// @brief Invoked when data failed to load
-            static BSHookUtils::UnorderedEventCallback<> dataLoadFailed;
+            static BSHookUtils::UnorderedEventCallback<std::string> dataLoadFailed;
+
         private:
             SongDetails() noexcept;
             static void DataAvailableOrUpdated();
-            static void DataLoadFailed();
+            static void DataLoadFailed(std::string message);
 
             friend class SongDetailsContainer;
             static bool isLoading;

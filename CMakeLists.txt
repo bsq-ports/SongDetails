@@ -2,13 +2,28 @@ cmake_minimum_required(VERSION 3.22)
 
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/quest.cmake)
 
+# get the vcpkg dir from env variables
+if(EXISTS $ENV{VCPKG_ROOT})
+    set(VCPKG_ROOT $ENV{VCPKG_ROOT})
+else()
+    MESSAGE(ERROR "Please define the environment variable VCPKG_ROOT with the root to your vcpkg install!")
+endif()
+
+# vcpkg config. Must be before project
+message("VCPKG $ENV{VCPKG_ROOT}")
+set(VCPKG_TARGET_TRIPLET arm64-android)
+set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE ${CMAKE_ANDROID_NDK}/build/cmake/android.toolchain.cmake)
+set(VCPKG_MANIFEST_DIR ${CMAKE_SOURCE_DIR})
+set(VCPKG_INSTALLED_DIR ${CMAKE_SOURCE_DIR}/vcpkg_installed)
+string(REPLACE "\\" "/" VCPKG_ROOT_WINDOWS_FIX $ENV{VCPKG_ROOT})
+set(CMAKE_TOOLCHAIN_FILE ${VCPKG_ROOT_WINDOWS_FIX}/scripts/buildsystems/vcpkg.cmake)
+
 project(${PACKAGE_ID} VERSION ${PACKAGE_VERSION})
 
 # c++ standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 # define that stores the actual source directory
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -17,6 +32,17 @@ set(COMPILE_ID songdetails)
 
 # compile options used
 add_compile_options(-frtti -fPIE -fPIC -fexceptions -fvisibility=hidden)
+
+if(${CMAKE_BUILD_TYPE} STREQUAL "RELEASE" OR ${CMAKE_BUILD_TYPE} STREQUAL "RelWithDebInfo" OR ${CMAKE_BUILD_TYPE} STREQUAL "MinSizeRel")
+    
+    # Better optimizations
+    add_compile_options(-O3)
+
+    # LTO
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    add_compile_options(-flto)
+endif()
+
 # compile definitions used
 add_compile_definitions(VERSION=\"${PACKAGE_VERSION}\")
 add_compile_definitions(MOD_ID=\"${PACKAGE_ID}\")
@@ -38,14 +64,10 @@ add_library(
     ${CMAKE_SOURCE_DIR}/src/SongProto.pb.cc # it ends in .cc so add it manually
 )
 
-# get the vcpkg dir from env variables
-if(EXISTS $ENV{VCPKG_ROOT})
-    set(VCPKG_ROOT $ENV{VCPKG_ROOT})
-else()
-    MESSAGE(ERROR "Please define the environment variable VCPKG_ROOT with the root to your vcpkg install!")
-endif()
-
 target_include_directories(${COMPILE_ID} PRIVATE "${VCPKG_ROOT}/installed/arm64-android/include")
+
+find_package(unofficial-brotli CONFIG REQUIRED)
+find_package(protobuf CONFIG REQUIRED)
 
 # add src dir as include dir
 target_include_directories(${COMPILE_ID} PRIVATE ${SOURCE_DIR})
@@ -53,8 +75,6 @@ target_include_directories(${COMPILE_ID} PRIVATE ${SOURCE_DIR})
 target_include_directories(${COMPILE_ID} PRIVATE ${INCLUDE_DIR})
 # add shared dir as include dir
 target_include_directories(${COMPILE_ID} PUBLIC ${SHARED_DIR})
-# gzip library
-target_include_directories(${COMPILE_ID} PRIVATE ${INCLUDE_DIR}/gzip-hpp/include)
 
 target_include_directories(${COMPILE_ID} PRIVATE ${EXTERN_DIR}/includes)
 target_include_directories(${COMPILE_ID} SYSTEM PRIVATE ${EXTERN_DIR}/includes/libil2cpp/il2cpp/libil2cpp)
@@ -65,7 +85,8 @@ target_link_libraries(
     PRIVATE
     -llog
     -lz
-    "${VCPKG_ROOT}/installed/arm64-android/lib/libprotobuf.a"
+    unofficial::brotli::brotlidec
+    protobuf::libprotobuf
     ${EXTERN_DIR}/libs/libcurl.a
     ${EXTERN_DIR}/libs/libpaper2_scotland2.so
 )
