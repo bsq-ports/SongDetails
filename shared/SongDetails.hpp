@@ -6,6 +6,7 @@
 #include "Data/SongDifficulty.hpp"
 #include "SongArray.hpp"
 #include "DiffArray.hpp"
+#include "TagsMap.hpp"
 #include <future>
 #include <filesystem>
 #include <functional>
@@ -15,6 +16,7 @@ namespace SongDetailsCache {
         public:
             SongArray songs = SongArray();
             DiffArray difficulties = DiffArray();
+            TagsMap tags = TagsMap();
             static std::future<SongDetails*> Init();
             static std::future<SongDetails*> Init(int refreshIfOlderThanHours);
             static void SetCacheDirectory(std::filesystem::path path);

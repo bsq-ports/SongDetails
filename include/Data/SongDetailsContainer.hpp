@@ -55,6 +55,7 @@ namespace SongDetailsCache {
             friend class HexUtil;
             friend class SongArray;
             friend class DiffArray;
+            friend class TagsMap;
 
             static constexpr const int HASH_SIZE_BYTES = 20;
             static_assert(HASH_SIZE_BYTES == sizeof(SongHash), "Song hashes should be 20 bytes");
