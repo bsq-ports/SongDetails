@@ -21,7 +21,7 @@
     },
     {
       "id": "paper2_scotland2",
-      "versionRange": "^4.4.2",
+      "versionRange": "^4.5.0",
       "additionalData": {
         "private": true
       }
