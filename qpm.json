@@ -1,4 +1,5 @@
 {
+  "version": "0.4.0",
   "sharedDir": "shared",
   "dependenciesDir": "extern",
   "info": {
@@ -11,22 +12,6 @@
       "cmake": false
     }
   },
-  "dependencies": [
-    {
-      "id": "libcurl",
-      "versionRange": "^7.78.0",
-      "additionalData": {
-        "private": true
-      }
-    },
-    {
-      "id": "paper2_scotland2",
-      "versionRange": "^4.5.0",
-      "additionalData": {
-        "private": true
-      }
-    }
-  ],
   "workspace": {
     "scripts": {
       "build": [
@@ -46,6 +31,26 @@
         "qpm qmod manifest",
         "pwsh ./scripts/createqmod.ps1 SongDetails -clean"
       ]
+    },
+    "ndk": "^27.2.12479018",
+    "qmodIncludeDirs": [],
+    "qmodIncludeFiles": [],
+    "qmodOutput": null
+  },
+  "dependencies": [
+    {
+      "id": "libcurl",
+      "versionRange": "^7.78.0",
+      "additionalData": {
+        "private": true
+      }
+    },
+    {
+      "id": "paper2_scotland2",
+      "versionRange": "^4.5.0",
+      "additionalData": {
+        "private": true
+      }
     }
-  }
+  ]
 }
