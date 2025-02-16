@@ -26,7 +26,7 @@ namespace SongDetailsCache {
 template <> struct SONGDETAILS_EXPORT fmt::formatter<::SongDetailsCache::RankedStatus> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
     template <typename FormatContext>
-    auto format(::SongDetailsCache::RankedStatus s, FormatContext& ctx) {
+    auto format(::SongDetailsCache::RankedStatus s, FormatContext& ctx) const {
         // return the specific case if possible
         switch (s) {
             case SongDetailsCache::RankedStatus::Unranked:

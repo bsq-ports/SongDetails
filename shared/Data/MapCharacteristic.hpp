@@ -27,7 +27,7 @@ namespace SongDetailsCache {
 template <> struct SONGDETAILS_EXPORT fmt::formatter<::SongDetailsCache::MapCharacteristic> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
     template <typename FormatContext>
-    auto format(::SongDetailsCache::MapCharacteristic c, FormatContext& ctx) {
+    auto format(::SongDetailsCache::MapCharacteristic c, FormatContext& ctx) const {
         // return the specific case if possible
         switch (c) {
             case ::SongDetailsCache::MapCharacteristic::Custom:

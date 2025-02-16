@@ -56,7 +56,7 @@ namespace SongDetailsCache {
 template <> struct SONGDETAILS_EXPORT fmt::formatter<::SongDetailsCache::RankedStates> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
     template <typename FormatContext>
-    auto format(::SongDetailsCache::RankedStates s, FormatContext& ctx) {
+    auto format(::SongDetailsCache::RankedStates s, FormatContext& ctx) const {
 
         std::string result = "";
         if (hasFlags(s, SongDetailsCache::RankedStates::BeatleaderRanked) ) {

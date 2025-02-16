@@ -13,3 +13,4 @@ vcpkg_installed/
 cmake-build-debug/
 .idea/
 ndkpath.txt
+.cache/

@@ -63,7 +63,7 @@ namespace SongDetailsCache {
 template <> struct SONGDETAILS_EXPORT fmt::formatter<::SongDetailsCache::MapMods> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
     template <typename FormatContext>
-    auto format(::SongDetailsCache::MapMods c, FormatContext& ctx) {
+    auto format(::SongDetailsCache::MapMods c, FormatContext& ctx) const {
         switch (c) {
             case SongDetailsCache::MapMods::None:
                 return formatter<string_view>::format("None", ctx);;

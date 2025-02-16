@@ -50,7 +50,7 @@ namespace SongDetailsCache {
 template <> struct SONGDETAILS_EXPORT fmt::formatter<::SongDetailsCache::UploadFlags> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
     template <typename FormatContext>
-    auto format(::SongDetailsCache::UploadFlags s, FormatContext& ctx) {
+    auto format(::SongDetailsCache::UploadFlags s, FormatContext& ctx) const {
 
         std::string result;
         if (hasFlags(s, SongDetailsCache::UploadFlags::Curated) ) {
