@@ -192,7 +192,8 @@ namespace SongDetailsCache {
             newSongNames->emplace_back(parsedSong->songname());
             newSongAuthorNames->emplace_back(parsedSong->songauthorname());
             newLevelAuthorNames->emplace_back(parsedSong->levelauthorname());
-            newUploaderNames->emplace_back(parsedSong->has_uploadername()? parsedSong->uploadername() : "");
+            // If they're equal, uploaderName is omitted from the dump
+            newUploaderNames->emplace_back(parsedSong->has_uploadername() ? parsedSong->uploadername() : parsedSong->levelauthorname());
             if (parsedSong->difficulties().empty()) continue;
 
             for (const auto& diff : parsedSong->difficulties()) {
