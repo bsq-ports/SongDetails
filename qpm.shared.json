@@ -7,7 +7,7 @@
     "info": {
       "name": "SongDetails",
       "id": "song-details",
-      "version": "1.0.0",
+      "version": "1.0.4",
       "url": "https://github.com/bsq-ports/SongDetails",
       "additionalData": {
         "overrideSoName": "libsongdetails.so",

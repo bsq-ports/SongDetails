@@ -12,6 +12,8 @@ namespace SongDetailsCache {
         ME =                0x2, // alias
         Chroma =            0x4,
         Cinema =            0x8,
+        Vivify =            0x10,
+        VI =                0x10, // alias
 
         ME_NE = ME | NE,
         Chroma_NE = Chroma | NE,
@@ -24,6 +26,8 @@ namespace SongDetailsCache {
         Cinema_Chroma_NE = Cinema | Chroma | NE,
         Cinema_Chroma_ME = Cinema | Chroma | ME,
         Cinema_Chroma_ME_NE = Cinema | Chroma | ME | NE,
+        Chroma_NE_VI = Chroma | NE | Vivify,
+        Chroma_VI = Chroma | Vivify,
     };
 
     static constexpr MapMods operator |(const MapMods& lhs, const MapMods& rhs) {
@@ -52,6 +56,7 @@ namespace SongDetailsCache {
         if (hasFlags(mods, MapMods::MappingExtensions)) result.emplace_back("Mapping Extensions");
         if (hasFlags(mods, MapMods::Chroma)) result.emplace_back("Chroma");
         if (hasFlags(mods, MapMods::Cinema)) result.emplace_back("Cinema");
+        if (hasFlags(mods, MapMods::Vivify)) result.emplace_back("Vivify");
         return result;
     }
 }
@@ -59,7 +64,6 @@ namespace SongDetailsCache {
 // if we have fmt, add formatting methods
 #if __has_include("fmt/core.h")
 #include <fmt/core.h>
-#include <sstream>
 template <> struct SONGDETAILS_EXPORT fmt::formatter<::SongDetailsCache::MapMods> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
     template <typename FormatContext>
@@ -97,6 +101,12 @@ template <> struct SONGDETAILS_EXPORT fmt::formatter<::SongDetailsCache::MapMods
                 return formatter<string_view>::format("Mapping Extensions, Chroma, Cinema", ctx);
             case SongDetailsCache::MapMods::Cinema_Chroma_ME_NE:
                 return formatter<string_view>::format("Noodle Extensions, Mapping Extensions, Chroma, Cinema", ctx);
+            case SongDetailsCache::MapMods::Chroma_NE_VI:
+                return formatter<string_view>::format("Noodle Extensions, Chroma, Vivify", ctx);
+            case SongDetailsCache::MapMods::Vivify:
+                return formatter<string_view>::format("Vivify", ctx);
+            case SongDetailsCache::MapMods::Chroma_VI:
+                return formatter<string_view>::format("Chroma, Vivify", ctx);
         }
     }
 };
