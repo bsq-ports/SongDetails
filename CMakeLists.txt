@@ -24,6 +24,8 @@ project(${PACKAGE_ID} VERSION ${PACKAGE_VERSION})
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 
 # define that stores the actual source directory
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -31,7 +33,10 @@ set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set(COMPILE_ID songdetails)
 
 # compile options used
-add_compile_options(-frtti -fPIE -fPIC -fexceptions -fvisibility=hidden)
+add_compile_options(-frtti -fPIE -fPIC -fexceptions)
+
+# Stop leaking library symbols
+add_link_options(-Wl,--exclude-libs,ALL)
 
 if(${CMAKE_BUILD_TYPE} STREQUAL "RELEASE" OR ${CMAKE_BUILD_TYPE} STREQUAL "RelWithDebInfo" OR ${CMAKE_BUILD_TYPE} STREQUAL "MinSizeRel")
     
