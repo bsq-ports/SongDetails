@@ -3,14 +3,24 @@
 #include "Utils.hpp"
 #include "logging.hpp"
 
+#include <algorithm>
 #include <vector>
 #include <fstream>
+#include <memory>
+#include <new>
 #include <sstream>
 #include <fmt/core.h>
 #include <sys/stat.h>
 #include "brotli/decode.h"
 
 namespace SongDetailsCache {
+    namespace {
+        constexpr size_t BROTLI_INITIAL_OUTPUT_SIZE = 10 * 1024 * 1024; // 10 MiB
+        constexpr size_t BROTLI_MAX_OUTPUT_SIZE = 256 * 1024 * 1024; // 256 MiB
+
+        using BrotliDecoderPtr = std::unique_ptr<BrotliDecoderState, decltype(&BrotliDecoderDestroyInstance)>;
+    }
+
     std::filesystem::path DataGetter::basePath{"/sdcard/ModData/com.beatgames.beatsaber/Mods/SongDetails"};
     std::filesystem::path DataGetter::cachePath() { return basePath / "SongDetailsCache.proto"; }
     std::filesystem::path DataGetter::cachePathEtag(std::string_view source) {
@@ -48,80 +58,81 @@ namespace SongDetailsCache {
     }
 
     bool DataGetter::DecompressBrotli(std::vector<uint8_t>& out, const std::string& in) {
-        const size_t size = in.size();
-        const char* data = in.c_str();
-        if (size == 0) return false;
-
-        // Create decoder state
-        BrotliDecoderState* state = BrotliDecoderCreateInstance(nullptr, nullptr, nullptr);
-        if (!state)
-            return false; // Could not create decoder state
-
-
-        const size_t chunk_size = 1024 * 1024 * 1; // 1MB
-
-        // Clear the output vector to start fresh
         out.clear();
-        out.resize(chunk_size * 10); // Reserve 10 chunks of 1MB
+        if (in.empty()) return false;
 
-        // Variables to track input
-        const auto* next_in = reinterpret_cast<const uint8_t*>(data); // Next byte to read from
-        size_t available_in = size;
+        BrotliDecoderPtr state(
+            BrotliDecoderCreateInstance(nullptr, nullptr, nullptr),
+            &BrotliDecoderDestroyInstance
+        );
+        if (!state) return false;
 
-        // Variable to track output
-        size_t available_out = out.size(); // Available bytes to write to
-        uint8_t* next_out = &out[0]; // Next byte to write to
-        size_t total_out = 0; // Total number of bytes written to the output buffer
+        try {
+            // Temp array where brotli decodes 
+            std::vector<uint8_t> decoded(BROTLI_INITIAL_OUTPUT_SIZE);
 
-        while (true) {
-            const size_t old_size = out.size();
+            // Pointers to the input and output buffers, as required by the Brotli API
+            const auto* next_in = reinterpret_cast<const uint8_t*>(in.data()); // Next byte to read from
+            size_t available_in = in.size();
+            uint8_t* next_out = decoded.data(); // Next byte to write to
+            size_t available_out = decoded.size();  // Available bytes to write to
+            size_t total_out = 0; // Total number of bytes written to the output buffer
 
-            // Reserve more space if we run out
-            if (available_out < chunk_size) {
-                out.resize(old_size + chunk_size);
-                available_out = (old_size + chunk_size) - total_out;
-                next_out = &out[total_out];
-            }
+            while (true) {
+                const BrotliDecoderResult result = BrotliDecoderDecompressStream(
+                    state.get(),
+                    &available_in,
+                    &next_in,
+                    &available_out,
+                    &next_out,
+                    &total_out
+                );
 
-            // Do the decompression
-            BrotliDecoderResult result = BrotliDecoderDecompressStream(
-                state,
-                &available_in,
-                &next_in,
-                &available_out,
-                &next_out,
-                &total_out
-            );
+                switch (result) {
+                    case BROTLI_DECODER_RESULT_SUCCESS:
+                        // This database is exactly one Brotli stream. Do not silently
+                        // accept a valid stream followed by unrelated trailing bytes.
+                        if (available_in != 0 || !BrotliDecoderIsFinished(state.get())) {
+                            ERROR("Brotli stream finished with {} trailing input bytes", available_in);
+                            return false;
+                        }
 
-            if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT) {
-                // The decoder wants more input, but we have no more data left in `available_in`
-                if (available_in == 0) {
-                    BrotliDecoderDestroyInstance(state);
-                    out.clear();
-                    return false; // Incomplete data
+                        decoded.resize(total_out);
+                        out = std::move(decoded);
+                        return true;
+
+                    case BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT: {
+                        if (decoded.size() >= BROTLI_MAX_OUTPUT_SIZE) {
+                            ERROR("Brotli output exceeded the {} byte limit", BROTLI_MAX_OUTPUT_SIZE);
+                            return false;
+                        }
+
+                        // Grow geometrically while clamping to the configured maximum.
+                        const size_t remaining_capacity = BROTLI_MAX_OUTPUT_SIZE - decoded.size();
+                        const size_t growth = std::min(decoded.size(), remaining_capacity);
+                        decoded.resize(decoded.size() + growth);
+                        available_out = decoded.size() - total_out;
+                        next_out = decoded.data() + total_out;
+                        break;
+                    }
+
+                    case BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT:
+                        // The entire HTTP response was supplied above, so asking for
+                        // more input means that the compressed stream is incomplete.
+                        ERROR("Brotli stream ended before decompression completed");
+                        return false;
+
+                    case BROTLI_DECODER_RESULT_ERROR: {
+                        const auto error = BrotliDecoderGetErrorCode(state.get());
+                        ERROR("Brotli decompression failed: {}", BrotliDecoderErrorString(error));
+                        return false;
+                    }
                 }
             }
-            else if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT) {
-                // Our buffer was completely filled, so we loop again to extend it
-                continue;
-            }
-            else if (result == BROTLI_DECODER_RESULT_SUCCESS) {
-                // Decompression successful
-                // Resize the vector to the actual number of bytes we wrote in this iteration
-                if (out.size() > total_out) {
-                    out.resize(total_out);
-                }
-                break;
-            }
-            else {
-                // Some error occurred
-                BrotliDecoderDestroyInstance(state);
-                out.clear();
-                return false;
-            }
+        } catch (const std::bad_alloc&) {
+            ERROR("Failed to allocate memory while decompressing Brotli data");
+            return false;
         }
-        BrotliDecoderDestroyInstance(state);
-        return true;
     }
 
     std::optional<DataGetter::DownloadedDatabase> DataGetter::UpdateAndReadDatabase_internal(std::string_view dataSourceName) {
