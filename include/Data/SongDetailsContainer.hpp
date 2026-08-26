@@ -37,6 +37,7 @@ namespace SongDetailsCache {
             SongHash(const std::string& str);
             bool operator ==(const SongHash& other) const noexcept { return c1 == other.c1 && c2 == other.c2 && c3 == other.c3; }
         private:
+            explicit SongHash(const uint8_t* bytes) noexcept;
             SongHash();
             friend class SongDetailsContainer;
             friend class HexUtil;
@@ -69,7 +70,7 @@ namespace SongDetailsCache {
             static shared_ptr_unordered_map<std::string, uint64_t> tags;
 
             static std::chrono::sys_seconds scrapeEndedTimeUnix;
-            static std::chrono::seconds updateThrottle;
+            static std::chrono::steady_clock::time_point lastSuccessfulUpdate;
 
             static shared_ptr_vector<Song> songs;
             static shared_ptr_vector<SongDifficulty> difficulties;
@@ -81,8 +82,8 @@ namespace SongDetailsCache {
             static BSHookUtils::UnorderedEventCallback<std::string> dataLoadFailedInternal;
 
             static void Load_internal(bool reload, int acceptableAgeHours);
-            static void Process(const std::vector<uint8_t>& data, bool force = true);
-            static void Process(std::istream& istream, bool force = true);
-            static void Process(const Structs::SongDetailsV3& parsedContainer, bool force = true);
+            static bool Process(const std::vector<uint8_t>& data, bool force = true);
+            static bool Process(std::istream& istream, bool force = true);
+            static bool Process(const Structs::SongDetailsV3& parsedContainer, bool force = true);
     };
 }

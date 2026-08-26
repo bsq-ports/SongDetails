@@ -2,12 +2,37 @@
 #include "logging.hpp"
 #include "SongDetails.hpp"
 #include "Data/DataGetter.hpp"
+#include <cstring>
+#include <limits>
+#include <string_view>
 #include <sys/stat.h>
+#include <unordered_set>
 #include "StopWatch.hpp"
 
 #include "SongProto.pb.h"
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
 
 namespace SongDetailsCache {
+    namespace {
+        constexpr int MAX_DATABASE_SIZE = 256 * 1024 * 1024;
+
+        template<typename T>
+        T ReadUnaligned(const uint8_t* bytes) noexcept {
+            T value{};
+            std::memcpy(&value, bytes, sizeof(value));
+            return value;
+        }
+
+        template<typename T>
+        T ReadStringBytes(std::string_view bytes, std::size_t offset) noexcept {
+            if (offset > bytes.size() || sizeof(T) > bytes.size() - offset) return {};
+            return ReadUnaligned<T>(
+                reinterpret_cast<const uint8_t*>(bytes.data() + offset)
+            );
+        }
+    }
+
     shared_ptr_vector<uint32_t> SongDetailsContainer::keys;
     shared_ptr_vector<SongHash> SongDetailsContainer::hashBytes;
     shared_ptr_vector<uint32_t> SongDetailsContainer::hashBytesLUT;
@@ -18,7 +43,7 @@ namespace SongDetailsCache {
     shared_ptr_unordered_map<std::string, uint64_t> SongDetailsContainer::tags;
 
     std::chrono::sys_seconds SongDetailsContainer::scrapeEndedTimeUnix;
-    std::chrono::seconds SongDetailsContainer::updateThrottle = std::chrono::seconds(0);
+    std::chrono::steady_clock::time_point SongDetailsContainer::lastSuccessfulUpdate{};
 
     shared_ptr_vector<Song> SongDetailsContainer::songs;
     shared_ptr_vector<SongDifficulty> SongDetailsContainer::difficulties;
@@ -36,62 +61,93 @@ namespace SongDetailsCache {
         struct stat fInfo = {0};
 
         bool shouldLoadFresh = false;
+        bool cacheFileValid = false;
         if (stat(DataGetter::cachePath().c_str(), &fInfo) == 0) { // only succeeds if exists
-            if (!get_isDataAvailable() || reload) {
-                try {
-                    auto cachedStreamOpt = DataGetter::ReadCachedDatabase();
-                    if (cachedStreamOpt) {
-                        DEBUG("Processing cached data!");
-                        StopWatch sw; sw.Start();
-                        Process(*cachedStreamOpt, false);
-                        DEBUG("Processed cached data in {}ms", sw.EllapsedMilliseconds());
-                        cachedStreamOpt->close();
+            try {
+                auto cachedStreamOpt = DataGetter::ReadCachedDatabase();
+                if (cachedStreamOpt) {
+                    DEBUG("Processing cached data!");
+                    StopWatch sw; sw.Start();
+                    cacheFileValid = Process(*cachedStreamOpt, false);
+                    DEBUG("Processed cached data in {}ms", sw.EllapsedMilliseconds());
+                    cachedStreamOpt->close();
 
-                        if (!get_isDataAvailable()) {
-                            INFO("Failed to load cached data, will try to load fresh data");
-                            shouldLoadFresh = true;
-                        }
+                    if (!cacheFileValid) {
+                        INFO("Cached data was invalid, will download fresh data");
+                        shouldLoadFresh = true;
                     }
-                } catch (...) {
-                    ERROR("Failed to read cached data, will try to load fresh data");
+                } else {
                     shouldLoadFresh = true;
                 }
+            } catch (const std::exception& exception) {
+                ERROR(
+                    "Failed to read cached data, will download fresh data: {}",
+                    exception.what()
+                );
+                shouldLoadFresh = true;
+            } catch (...) {
+                ERROR("Failed to read cached data, will download fresh data");
+                shouldLoadFresh = true;
             }
 
             if (get_isDataAvailable() && std::chrono::system_clock::now().time_since_epoch() - scrapeEndedTimeUnix.time_since_epoch() > std::chrono::hours(std::max(acceptableAgeHours, 1))) {
                 shouldLoadFresh = true;
             }
+            if (reload) shouldLoadFresh = true;
         } else { // didn't exist or otherwise failed
             shouldLoadFresh = true;
         }
 
-        if (!shouldLoadFresh || (system_clock::now().time_since_epoch() - updateThrottle < 30min)) {
+        const auto now = steady_clock::now();
+        const bool recentlyUpdated =
+            lastSuccessfulUpdate != steady_clock::time_point{} &&
+            now - lastSuccessfulUpdate < 30min;
+        if (!shouldLoadFresh || (!reload && cacheFileValid && recentlyUpdated)) {
             SongDetails::isLoading = false;
             return;
         }
 
+        bool refreshCompleted = false;
+
         for (const auto& [src, _] : DataGetter::dataSources) {
             try {
-                auto db = DataGetter::UpdateAndReadDatabase(src).get();
+                // A conditional request is safe only when the local cache has
+                // parsed and passed all structural validation checks.
+                auto db = DataGetter::UpdateAndReadDatabase(src, cacheFileValid).get();
                 if (!db.has_value()) {
+                    // A 304 response means the already validated cache remains current.
+                    refreshCompleted = true;
                     break;
                 }
 
                 StopWatch sw; sw.Start();
-                Process(*db->data);
+                if (!Process(*db->data)) {
+                    ERROR("Downloaded invalid data from source {}", src);
+                    cacheFileValid = false;
+                    continue;
+                }
+                refreshCompleted = true;
                 DEBUG("Processed new data in {}ms", sw.EllapsedMilliseconds());
                 sw.Restart();
-                DataGetter::WriteCachedDatabase(*db).wait();
-                DEBUG("Wrote data in {}ms", sw.EllapsedMilliseconds());
+                if (DataGetter::WriteCachedDatabase(std::move(*db)).get()) {
+                    cacheFileValid = true;
+                    DEBUG("Wrote data in {}ms", sw.EllapsedMilliseconds());
+                } else {
+                    ERROR("Failed to cache database from source {}", src);
+                }
 
                 if (get_isDataAvailable()) {
                     break;
                 }
-
-                ERROR("Data load failed for unknown reason");
+            } catch (const std::exception& exception) {
+                ERROR("Failed to download from source {}: {}", src, exception.what());
             } catch (...) {
-                ERROR("Failed to download from source {}", src);
+                ERROR("Failed to download from source {} due to an unknown error", src);
             }
+        }
+
+        if (refreshCompleted) {
+            lastSuccessfulUpdate = steady_clock::now();
         }
 
         if (!get_isDataAvailable()) {
@@ -101,44 +157,101 @@ namespace SongDetailsCache {
         SongDetails::isLoading = false;
     }
 
-    void SongDetailsContainer::Process(std::istream& istream, bool force) {
-        if (!force && songs) return;
+    bool SongDetailsContainer::Process(std::istream& istream, bool force) {
         StopWatch sw; sw.Start();
         Structs::SongDetailsV3 parsedContainer;
-        if (!parsedContainer.ParseFromIstream(&istream)) {
+        google::protobuf::io::IstreamInputStream rawInput(&istream);
+        google::protobuf::io::CodedInputStream codedInput(&rawInput);
+        codedInput.SetTotalBytesLimit(MAX_DATABASE_SIZE);
+        if (
+            !parsedContainer.ParseFromCodedStream(&codedInput) ||
+            !codedInput.ConsumedEntireMessage()
+        ) {
             ERROR("Failed to parse Song container from istream!");
-            return;
+            return false;
         }
 
         INFO("Parsed protobuf in {}ms", sw.EllapsedMilliseconds());
-        Process(parsedContainer, force);
+        return Process(parsedContainer, force);
     }
 
-    void SongDetailsContainer::Process(const std::vector<uint8_t>& data, bool force) {
-        if (!force && songs) return;
-
+    bool SongDetailsContainer::Process(const std::vector<uint8_t>& data, bool force) {
         StopWatch sw; sw.Start();
         Structs::SongDetailsV3 parsedContainer;
-        if (!parsedContainer.ParseFromArray(data.data(), data.size())) {
+        if (data.size() > static_cast<std::size_t>(MAX_DATABASE_SIZE)) {
+            ERROR("Song container exceeded the {} byte parsing limit", MAX_DATABASE_SIZE);
+            return false;
+        }
+        if (!parsedContainer.ParseFromArray(data.data(), static_cast<int>(data.size()))) {
             ERROR("Failed to parse Song container from data!");
-            return;
+            return false;
         }
 
         INFO("Parsed protobuf in {}ms", sw.EllapsedMilliseconds());
-        Process(parsedContainer, force);
+        return Process(parsedContainer, force);
     }
 
-    void SongDetailsContainer::Process(const Structs::SongDetailsV3& parsedContainer, bool force) {
-        if (!force && songs) return;
-
-        scrapeEndedTimeUnix = std::chrono::sys_seconds(std::chrono::seconds(parsedContainer.scrapeendedunix()));
+    bool SongDetailsContainer::Process(const Structs::SongDetailsV3& parsedContainer, bool force) {
+        constexpr uint32_t expectedFormatVersion = 3;
         auto& parsedField = parsedContainer.songs();
 
-        if (parsedField.size() == 0) {
-            ERROR("Parsing data yielded no songs!");
-            return;
+        if (parsedContainer.formatversion() != expectedFormatVersion) {
+            ERROR(
+                "Unsupported SongDetails format version: expected {}, got {}",
+                expectedFormatVersion,
+                parsedContainer.formatversion()
+            );
+            return false;
         }
-        const auto len = parsedField.size();
+
+        if (parsedField.empty()) {
+            ERROR("Parsing data yielded no songs!");
+            return false;
+        }
+
+        const auto songCount = static_cast<std::size_t>(parsedField.size());
+        const auto expectedHashBytes = songCount * HASH_SIZE_BYTES;
+        if (parsedContainer.songhashes().size() != expectedHashBytes) {
+            ERROR(
+                "Song hash data had an invalid size: expected {}, got {}",
+                expectedHashBytes,
+                parsedContainer.songhashes().size()
+            );
+            return false;
+        }
+
+        constexpr int maxTagCount = std::numeric_limits<uint64_t>::digits;
+        const int tagCount = parsedContainer.taglist_size();
+        if (tagCount > maxTagCount) {
+            ERROR(
+                "Song tag list exceeded the {} tag bitmask limit: got {}",
+                maxTagCount,
+                parsedContainer.taglist_size()
+            );
+            return false;
+        }
+
+        std::unordered_set<std::string_view> uniqueTags;
+        uniqueTags.reserve(static_cast<std::size_t>(tagCount));
+        for (const auto& tag : parsedContainer.taglist()) {
+            if (tag.empty()) {
+                ERROR("Song tag list contained an empty tag");
+                return false;
+            }
+            if (!uniqueTags.emplace(tag).second) {
+                ERROR("Song tag list contained duplicate tag '{}'", tag);
+                return false;
+            }
+        }
+
+        // A valid cache can still be useful for conditional requests even when
+        // an existing in-memory database should not be replaced.
+        if (!force && songs) return true;
+
+        const auto newScrapeEndedTimeUnix = std::chrono::sys_seconds(
+            std::chrono::seconds(parsedContainer.scrapeendedunix())
+        );
+        const auto len = songCount;
         StopWatch sw; sw.Start();
 
         std::vector<const Structs::SongV3*> parsed;
@@ -177,17 +290,19 @@ namespace SongDetailsCache {
         // Fill the tags
         auto& parsedTagList = parsedContainer.taglist();
         for (int i = 0; i < parsedTagList.size(); i++) {
-            newTags->emplace(parsedTagList[i], 1UL << i);
+            newTags->emplace(parsedTagList[i], uint64_t{1} << i);
         }
 
         // Cast it to a vector of SongHashes
-        auto songHashesRaw = reinterpret_cast<const SongHash*>(parsedContainer.songhashes().data());
+        const auto* songHashesRaw = reinterpret_cast<const uint8_t*>(
+            parsedContainer.songhashes().data()
+        );
         for (std::size_t i = 0; i < len; i++) {
             const auto& parsedSong = parsed[i];
             uint8_t diffCount = std::min(255, parsedSong->difficulties_size());
             const auto& builtSong = newSongs->emplace_back(i, diffIndex, diffCount, parsedSong);
             newKeys->emplace_back(parsedSong->mapid());
-            newHashes->emplace_back(songHashesRaw[i]);
+            newHashes->push_back(SongHash(songHashesRaw + i * HASH_SIZE_BYTES));
 
             newSongNames->emplace_back(parsedSong->songname());
             newSongAuthorNames->emplace_back(parsedSong->songauthorname());
@@ -218,7 +333,7 @@ namespace SongDetailsCache {
         INFO("Made hashes LUT in {}ms", sw.EllapsedMilliseconds());
 
         INFO("Finished Processing");
-        if (!force && songs) return;
+        if (!force && songs) return true;
 
         INFO("Assigning new values");
         songs = newSongs;
@@ -233,14 +348,25 @@ namespace SongDetailsCache {
         tags = newTags;
 
         difficulties = newDiffs;
+        scrapeEndedTimeUnix = newScrapeEndedTimeUnix;
 
         if (get_isDataAvailable()) {
             try {
                 dataAvailableOrUpdatedInternal.invoke();
             } catch (const std::exception& _) {}
         }
+        return get_isDataAvailable();
     }
 
-    SongHash::SongHash(const std::string& str) : SongHash() { std::memcpy((void*)&c1, str.c_str(), SongDetailsContainer::HASH_SIZE_BYTES); }
+    SongHash::SongHash(const uint8_t* bytes) noexcept :
+        c1(ReadUnaligned<uint32_t>(bytes)),
+        c2(ReadUnaligned<uint64_t>(bytes + sizeof(c1))),
+        c3(ReadUnaligned<uint64_t>(bytes + sizeof(c1) + sizeof(c2))) {}
+
+    SongHash::SongHash(const std::string& str) :
+        c1(ReadStringBytes<uint32_t>(str, 0)),
+        c2(ReadStringBytes<uint64_t>(str, sizeof(c1))),
+        c3(ReadStringBytes<uint64_t>(str, sizeof(c1) + sizeof(c2))) {}
+
     SongHash::SongHash() : c1(0), c2(0), c3(0) {}
 }
