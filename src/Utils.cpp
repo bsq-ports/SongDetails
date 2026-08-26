@@ -2,191 +2,255 @@
 #include "logging.hpp"
 #include "Data/SongDetailsContainer.hpp"
 
-#include <unordered_map>
-#include <sstream>
-#include <iomanip>
+#include <charconv>
+#include <limits>
+#include <memory>
+#include <stdexcept>
 
-#define USER_AGENT "https://github.com/RedBrumbler/SongDetails/" VERSION
 namespace SongDetailsCache {
-    static const std::unordered_map<uint8_t, char> hexToChar = {
-        {0x0, '0'}, {0x1, '1'}, {0x2, '2'}, {0x3, '3'},
-        {0x4, '4'}, {0x5, '5'}, {0x6, '6'}, {0x7, '7'},
-        {0x8, '8'}, {0x9, '9'}, {0xa, 'a'}, {0xb, 'b'},
-        {0xc, 'c'}, {0xd, 'd'}, {0xe, 'e'}, {0xf, 'f'},
-    };
+    namespace {
+        constexpr std::size_t MAX_WEB_RESPONSE_SIZE = std::size_t{128} * 1024 * 1024; // 128 MiB
+        constexpr std::size_t MAX_WEB_HEADER_SIZE = std::size_t{1} * 1024 * 1024; // 1 MiB
+        constexpr char USER_AGENT[] = "https://github.com/bsq-ports/SongDetails/" VERSION;
+        constexpr char HEX_DIGITS[] = "0123456789ABCDEF";
 
-    std::string HexUtil::ByteArrayToHex(std::span<uint8_t> bytes) {
-        std::stringstream str;
-        static const char hex[] = "0123456789ABCDEF";
-        for (auto v : bytes) {
-            str << hex[(v >> 4) & 0xF] << hex[v & 0xF];
+        class CurlGlobal final {
+            public:
+                CurlGlobal() : status(curl_global_init(CURL_GLOBAL_DEFAULT)) {}
+                ~CurlGlobal() {
+                    if (status == CURLE_OK) curl_global_cleanup();
+                }
+
+                const CURLcode status;
+        };
+
+        const CurlGlobal& GetCurlGlobal() {
+            static CurlGlobal global;
+            return global;
         }
-        return str.str();
+
+        struct CurlWriteTarget {
+            std::string& output;
+            std::size_t maximumSize;
+            bool limitExceeded = false;
+            bool writeFailed = false;
+        };
+
+        std::size_t CurlWriteCallback(
+            char* contents,
+            std::size_t size,
+            std::size_t nmemb,
+            void* userdata
+        ) noexcept {
+            auto* target = static_cast<CurlWriteTarget*>(userdata);
+            if (!target) return 0;
+
+            try {
+                if (size != 0 && nmemb > std::numeric_limits<std::size_t>::max() / size) {
+                    target->limitExceeded = true;
+                    return 0;
+                }
+
+                const std::size_t length = size * nmemb;
+                if (
+                    target->output.size() > target->maximumSize ||
+                    length > target->maximumSize - target->output.size()
+                ) {
+                    target->limitExceeded = true;
+                    return 0;
+                }
+
+                target->output.append(contents, length);
+                return length;
+            } catch (...) {
+                target->writeFailed = true;
+                return 0;
+            }
+        }
+
+        using CurlHandle = std::unique_ptr<CURL, decltype(&curl_easy_cleanup)>;
+        using CurlHeaderList = std::unique_ptr<curl_slist, decltype(&curl_slist_free_all)>;
+
+        bool AppendCurlHeader(CurlHeaderList& headers, const std::string& header) {
+            auto* original = headers.release();
+            auto* appended = curl_slist_append(original, header.c_str());
+            headers.reset(appended ? appended : original);
+            return appended != nullptr;
+        }
+
+        template<typename T>
+        bool SetCurlOption(
+            CURL* curl,
+            CURLoption option,
+            T value,
+            WebUtil::WebResponse& response
+        ) {
+            const auto status = curl_easy_setopt(curl, option, value);
+            if (status == CURLE_OK) return true;
+
+            response.curlStatus = status;
+            ERROR(
+                "curl_easy_setopt({}) failed: {} ({})",
+                static_cast<int>(option),
+                curl_easy_strerror(status),
+                static_cast<int>(status)
+            );
+            return false;
+        }
     }
 
-    std::string HexUtil::SongBytesToHash(std::size_t index) {
-        std::string result;
-        result.resize(SongDetailsContainer::HASH_SIZE_BYTES * 2);
-        const uint8_t* bytes = SongDetailsContainer::hashBytes->operator[](index);
-
-        uint16_t* resultP2 = (uint16_t*)result.data();
-        for (std::size_t i = 0; i < SongDetailsContainer::HASH_SIZE_BYTES; i++) {
-            static const char hex[] = "0123456789ABCDEF";
-            result[i*2+0] = hex[(bytes[i] >> 4) & 0xF];
-			result[i*2+1] = hex[bytes[i] & 0xF];
+    std::string HexUtil::ByteArrayToHex(std::span<const uint8_t> bytes) {
+        std::string result(bytes.size() * 2, '\0');
+        for (std::size_t i = 0; i < bytes.size(); ++i) {
+            result[i * 2] = HEX_DIGITS[bytes[i] >> 4];
+            result[i * 2 + 1] = HEX_DIGITS[bytes[i] & 0x0f];
         }
         return result;
     }
 
-    static const std::unordered_map<char, uint8_t> charToHex = {
-        {'a', 0xa}, {'A', 0xa}, {'b', 0xb}, {'B', 0xb},
-        {'c', 0xc}, {'C', 0xc}, {'d', 0xd}, {'D', 0xd},
-        {'e', 0xe}, {'E', 0xe}, {'f', 0xf}, {'F', 0xf},
-        {'0', 0x0}, {'1', 0x1}, {'2', 0x2}, {'3', 0x3},
-        {'4', 0x4}, {'5', 0x5}, {'6', 0x6}, {'7', 0x7},
-        {'8', 0x8}, {'9', 0x9}
-    };
+    std::string HexUtil::SongBytesToHash(std::size_t index) {
+        const uint8_t* bytes = SongDetailsContainer::hashBytes->operator[](index);
+        return ByteArrayToHex({bytes, SongDetailsContainer::HASH_SIZE_BYTES});
+    }
 
     SongHash HexUtil::ToSongHash(std::string_view hex) {
+        if (hex.size() != SongDetailsContainer::HASH_SIZE_BYTES * 2) return SongHash();
+
         try {
-            return *(SongHash*)ToBytes(hex).data();
-        } catch (const std::exception& e) {
+            const auto bytes = ToBytes(hex);
+            return SongHash(bytes.data());
+        } catch (const std::invalid_argument&) {
             return SongHash();
         }
     }
 
     std::vector<uint8_t> HexUtil::ToBytes(std::string_view hex) {
-        std::vector<uint8_t> result{};
-        result.resize(hex.size() / 2);
-        char left, right;
-        try {
-            std::size_t byteIdx = 0;
-            for (std::size_t i = 0; i < hex.size(); i += 2, byteIdx++) {
-                left = hex[i]; right = hex[i + 1];
-                result[byteIdx] = ((charToHex.at(left) << 4) | charToHex.at(right));
+        if (hex.size() % 2 != 0) {
+            throw std::invalid_argument("Hex string must contain an even number of characters");
+        }
+
+        std::vector<uint8_t> result(hex.size() / 2);
+        for (std::size_t i = 0; i < result.size(); ++i) {
+            unsigned int value = 0;
+            const char* first = hex.data() + i * 2;
+            const char* last = first + 2;
+            const auto [end, error] = std::from_chars(first, last, value, 16);
+            if (error != std::errc{} || end != last) {
+                throw std::invalid_argument("Hex string contains a non-hex character");
             }
-        } catch (const std::out_of_range& e) {
-            throw "Hex string has a non-hex character";
+            result[i] = static_cast<uint8_t>(value);
         }
         return result;
     }
 
+    std::future<WebUtil::WebResponse> WebUtil::GetAsync(
+        std::string_view url,
+        uint32_t timeoutSeconds,
+        const Headers& headers
+    ) {
+        const auto globalStatus = GetCurlGlobal().status;
+        if (globalStatus != CURLE_OK) {
+            ERROR(
+                "curl_global_init() failed: {} ({})",
+                curl_easy_strerror(globalStatus),
+                static_cast<int>(globalStatus)
+            );
+            return std::async(std::launch::deferred, [globalStatus] {
+                WebResponse response{};
+                response.curlStatus = globalStatus;
+                return response;
+            });
+        }
 
-    std::string query_encode(std::string_view s) {
-		std::stringstream ret;
-
-		#define IS_BETWEEN(ch, low, high) (ch >= low && ch <= high)
-		#define IS_ALPHA(ch) (IS_BETWEEN(ch, 'A', 'Z') || IS_BETWEEN(ch, 'a', 'z'))
-		#define IS_DIGIT(ch) IS_BETWEEN(ch, '0', '9')
-		#define IS_HEXDIG(ch) (IS_DIGIT(ch) || IS_BETWEEN(ch, 'A', 'F') || IS_BETWEEN(ch, 'a', 'f'))
-
-		for(size_t i = 0; i < s.size();) {
-			char ch = s[i++];
-
-			if (IS_ALPHA(ch) || IS_DIGIT(ch))
-			{
-				ret << ch;
-			}
-			else if ((ch == '%') && IS_HEXDIG(s[i+0]) && IS_HEXDIG(s[i+1]))
-			{
-				ret << s.substr(i-1, 3);
-				i += 2;
-			}
-			else
-			{
-				switch (ch)
-				{
-					case '-':
-					case '.':
-					case '_':
-					case '~':
-					case '!':
-					case '$':
-					case '&':
-					case '\'':
-					case '(':
-					case ')':
-					case '*':
-					case '+':
-					case ',':
-					case ';':
-					case '=':
-					case ':':
-					case '@':
-					case '/':
-					case '?':
-					case '[':
-					case ']':
-						ret << ch;
-						break;
-
-					default:
-					{
-						static const char hex[] = "0123456789ABCDEF";
-						ret << "%" << hex[(ch >> 4) & 0xF] << hex[ch & 0xF];
-						break;
-					}
-				}
-			}
-		}
-
-		return ret.str();
-	}
-
-	std::size_t CurlWrite_CallbackFunc_StdString(void *contents, std::size_t size, std::size_t nmemb, std::string *s) {
-		std::size_t newLength = size * nmemb;
-		try {
-			s->append((char*)contents, newLength);
-		} catch(std::bad_alloc &e) {
-			//handle memory problem
-			CRITICAL("Failed to allocate string of size: {}", newLength);
-			return 0;
-		}
-		return newLength;
-	}
-
-    std::future<WebUtil::WebResponse> WebUtil::GetAsync(std::string_view url, uint32_t timeout, const std::unordered_map<std::string, std::string>& headers) {
-        return std::async(std::launch::async, std::bind(&WebUtil::GetAsync_internal, std::string(url), timeout, headers));
+        return std::async(
+            std::launch::async,
+            [url = std::string(url), timeoutSeconds, headers]() mutable {
+                return GetAsync_internal(std::move(url), timeoutSeconds, std::move(headers));
+            }
+        );
     }
 
-    WebUtil::WebResponse WebUtil::GetAsync_internal(std::string url, uint32_t timeout, std::unordered_map<std::string, std::string> headers) {
-        WebResponse response;
+    WebUtil::WebResponse WebUtil::GetAsync_internal(
+        std::string url,
+        uint32_t timeoutSeconds,
+        Headers headers
+    ) {
+        WebResponse response{};
 
-        // Init curl
-        auto* curl = curl_easy_init();
-        struct curl_slist *curl_headers = NULL;
-        for (const auto& [key, value] : headers) {
-            curl_headers = curl_slist_append(curl_headers, fmt::format("{}: {}", key, value).c_str());
+        CurlHandle curl(curl_easy_init(), &curl_easy_cleanup);
+        if (!curl) {
+            ERROR("curl_easy_init() failed");
+            return response;
         }
 
-        // Set curl_headers
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, curl_headers);
+        CurlHeaderList curlHeaders(nullptr, &curl_slist_free_all);
+        for (const auto& [key, value] : headers) {
+            const auto header = fmt::format("{}: {}", key, value);
+            if (!AppendCurlHeader(curlHeaders, header)) {
+                ERROR("Failed to allocate curl request headers");
+                response.curlStatus = CURLE_OUT_OF_MEMORY;
+                return response;
+            }
+        }
 
-        curl_easy_setopt(curl, CURLOPT_URL, query_encode(url).c_str());
+        CurlWriteTarget contentTarget{response.content, MAX_WEB_RESPONSE_SIZE};
+        CurlWriteTarget headerTarget{response.headers, MAX_WEB_HEADER_SIZE};
+        const auto setOption = [&](CURLoption option, auto value) {
+            return SetCurlOption(curl.get(), option, value, response);
+        };
 
-        // Don't wait forever, time out after TIMEOUT seconds.
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
+        if (
+            !setOption(CURLOPT_HTTPHEADER, curlHeaders.get()) ||
+            !setOption(CURLOPT_URL, url.c_str()) ||
+            !setOption(CURLOPT_TIMEOUT, static_cast<long>(timeoutSeconds)) ||
+            !setOption(CURLOPT_NOSIGNAL, 1L) ||
+            !setOption(CURLOPT_MAXFILESIZE_LARGE, static_cast<curl_off_t>(MAX_WEB_RESPONSE_SIZE)) ||
+            !setOption(CURLOPT_FOLLOWLOCATION, 1L) ||
+            !setOption(CURLOPT_MAXREDIRS, 5L) ||
+            !setOption(CURLOPT_PROTOCOLS, static_cast<long>(CURLPROTO_HTTPS)) ||
+            !setOption(CURLOPT_REDIR_PROTOCOLS, static_cast<long>(CURLPROTO_HTTPS)) ||
+            !setOption(CURLOPT_WRITEFUNCTION, CurlWriteCallback) ||
+            !setOption(CURLOPT_WRITEDATA, &contentTarget) ||
+            !setOption(CURLOPT_HEADERFUNCTION, CurlWriteCallback) ||
+            !setOption(CURLOPT_HEADERDATA, &headerTarget) ||
+            !setOption(CURLOPT_USERAGENT, USER_AGENT) ||
+            // TODO: Configure a Quest-compatible CA bundle, then enable peer verification.
+            !setOption(CURLOPT_SSL_VERIFYPEER, 0L)
+        ) {
+            return response;
+        }
 
-        // Follow HTTP redirects if necessary.
-        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-
-        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString);
-
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response.content);
-        curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response.headers);
-        curl_easy_setopt(curl, CURLOPT_USERAGENT, USER_AGENT);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, false);
-
-        curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
-
-        response.curlStatus = curl_easy_perform(curl);
+        response.curlStatus = curl_easy_perform(curl.get());
         /* Check for errors */
         if (response.curlStatus != CURLE_OK) {
-            ERROR("curl_easy_perform() failed: {}: {}", (int)response.curlStatus, curl_easy_strerror(response.curlStatus));
+            if (contentTarget.limitExceeded) {
+                ERROR("HTTP response exceeded the {} byte limit", MAX_WEB_RESPONSE_SIZE);
+            } else if (headerTarget.limitExceeded) {
+                ERROR("HTTP response headers exceeded the {} byte limit", MAX_WEB_HEADER_SIZE);
+            } else if (contentTarget.writeFailed || headerTarget.writeFailed) {
+                ERROR("Failed to store the HTTP response in memory");
+            }
+            ERROR(
+                "curl_easy_perform() failed: {}: {}",
+                static_cast<int>(response.curlStatus),
+                curl_easy_strerror(response.curlStatus)
+            );
         }
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.httpCode);
-        curl_easy_cleanup(curl);
+
+        const auto infoStatus = curl_easy_getinfo(
+            curl.get(),
+            CURLINFO_RESPONSE_CODE,
+            &response.httpCode
+        );
+        if (infoStatus != CURLE_OK) {
+            ERROR(
+                "curl_easy_getinfo(CURLINFO_RESPONSE_CODE) failed: {} ({})",
+                curl_easy_strerror(infoStatus),
+                static_cast<int>(infoStatus)
+            );
+            if (response.curlStatus == CURLE_OK) response.curlStatus = infoStatus;
+        }
+
         return response;
     }
 }
